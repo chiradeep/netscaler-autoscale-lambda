@@ -1,0 +1,19 @@
+  aws lambda create-function --region us-west-2 --function-name   ConfigureNetScaler  --zip-file fileb://$PWD/bundle.zip --role arn:aws:iam::755166494752:role/lambda-vpc-execution --handler handler.handler --runtime python2.7 --vpc-config SubnetIds=subnet-953f09e3,SecurityGroupIds=sg-3c383945 
+
+python-lambda-local -l lib/ -f handler -t 50 handler.py event.json
+
+zip -r9 bundle.zip handler.py  bin/*
+
+aws lambda update-function-code  --function-name ConfigureNetScaler --zip-file fileb://$PWD/bundle.zip
+
+export NS_URL=http://172.20.0.9:32769/
+export NS_PASSWORD=nsroot
+export NS_LOGIN=nsroot
+export S3_TFSTATE_BUCKET=netscaler-lambda-autoscale-state
+export S3_TFCONFI_BUCKET=netscaler-lambda-autoscale-config
+
+aws s3 mb s3://$S3_TFSTATE_BUCKET
+aws s3 mb s3://$S3_TFCONFIG_BUCKET
+
+zip -r9 config.zip config/*
+aws s3 cp config.zip s3://$S3_TFCONFIG_BUCKET/config.zip
