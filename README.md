@@ -1,5 +1,5 @@
 # Automate NetScaler configuration in AWS using AWS Lambda
-
+<img src="docs/figure.png" width="480"/>
 
 # Pre-requisites
 * VPC with VPC endpoint to S3
