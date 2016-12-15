@@ -7,9 +7,23 @@ help:
 	@echo "  create-lambda       to create the lambda function in AWS"
 	@echo "  update-lambda       to update the lambda function in AWS"
 	@echo "  test-local          to test locally"
+	@echo "  invoke-lambda       to invoke execution in AWS"
 
-bundle.zip: handler.py bin/terraform-provider-netscaler
-	zip  bundle.zip handler.py bin/*
+dyndbdmutex.py:
+	curl -s -R -S -L -f https://github.com/chiradeep/lambda-mutex/releases/download/0.15/dyndbmutex-0.1.5.tar.gz -z dyndbmutex.py -o dyndbmutex-0.15.tar.gz
+	tar --strip-components=2 -xvzf dyndbmutex-0.15.tar.gz dyndbmutex-0.1.5/dyndbmutex/dyndbmutex.py
+	rm -f dyndbmutex-0.15.tar.gz
+
+terraform-binary:
+	curl -s -R -S -L -f https://github.com/citrix/terraform-provider-netscaler/releases/download/v0.8.1/terraform-provider-netscaler-linux-amd64.tar.gz -z bin/terraform-provider-netscaler-linux-amd64.tar.gz -o bin/terraform-provider-netscaler-linux-amd64.tar.gz
+	curl -s -S -L -f https://releases.hashicorp.com/terraform/0.8.1/terraform_0.8.1_linux_amd64.zip -z bin/terraform_0.8.1_linux_amd64.zip -o bin/terraform_0.8.1_linux_amd64.zip
+	(cd bin; tar xvzf terraform-provider-netscaler-linux-amd64.tar.gz)
+	(cd bin; unzip -o terraform_0.8.1_linux_amd64.zip)
+
+
+
+bundle.zip: handler.py dyndbdmutex.py terraform-binary 
+	zip  -r9 bundle.zip handler.py dyndbmutex.py bin/terraform bin/terraform-provider-netscaler
 
 config.zip: config/*
 	zip  config.zip config/*

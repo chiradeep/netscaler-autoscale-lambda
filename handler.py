@@ -4,6 +4,9 @@ import logging
 import boto3
 import botocore
 import zipfile
+import uuid
+import base64
+from dyndbmutex import DynamoDbMutex
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -20,11 +23,14 @@ asg_client = boto3.client('autoscaling')
 ec2_client = boto3.client('ec2')
 
 
+def random_name():
+    return base64.b32encode(str(uuid.uuid4()))[:8]
+
+
 def fetch_asg_instance_ips():
     result = []
     asg = os.environ['ASG_NAME']
-    groups = asg_client.describe_auto_scaling_groups(
-                 AutoScalingGroupNames=[asg]) 
+    groups = asg_client.describe_auto_scaling_groups(AutoScalingGroupNames=[asg])
     for group in groups['AutoScalingGroups']:
         instances = group['Instances']
         for instance in instances:
@@ -32,7 +38,7 @@ def fetch_asg_instance_ips():
             ec2_reservations = ec2_client.describe_instances(InstanceIds=[instance_id])
             for reservation in ec2_reservations['Reservations']:
                 ec2_instances = reservation['Instances']
-                for ec2_instance in ec2_instances: 
+                for ec2_instance in ec2_instances:
                     ec2_instance_id = ec2_instance['InstanceId']
                     logger.info("Found ec2_instance " + ec2_instance_id + " in ASG " + asg + ", state=" + ec2_instance['State']['Name'])
                     if ec2_instance['State']['Name'] != 'running':
@@ -46,8 +52,7 @@ def fetch_asg_instance_ips():
                         logger.info("Found private ip for " + ec2_instance_id + ": " + private_ip)
                         result.append(private_ip)
     return result
-                        
-              
+
 
 def fetch_tfstate():
     bucket = os.environ['S3_TFSTATE_BUCKET']
@@ -62,10 +67,11 @@ def fetch_tfstate():
             logger.info("Exception trying to download tfstate file, error_code=" + str(error_code))
             raise
 
+
 def fetch_tfconfig():
     bucket = os.environ['S3_TFCONFIG_BUCKET']
     try:
-        s3_client.download_file(bucket, tfconfig_key,  tfconfig_path)
+        s3_client.download_file(bucket, tfconfig_key, tfconfig_path)
         logger.info("Downloaded tfconfig file to " + tfconfig_path)
         zip_ref = zipfile.ZipFile(tfconfig_path, 'r')
         zip_ref.extractall(tfconfig_local_dir + "../")
@@ -77,6 +83,7 @@ def fetch_tfconfig():
         if error_code == 404:
             logger.info("TfConfig zip file does not exist in S3: cannot proceed")
         raise
+
 
 def upload_tfstate():
     bucket = os.environ['S3_TFSTATE_BUCKET']
@@ -108,9 +115,14 @@ def handler(event, context):
     command = "NS_URL={} NS_LOGIN={} NS_PASSWORD={} {}/terraform apply -state={} -backup=- -no-color -var-file={}/terraform.tfvars -var 'backend_services=[{}]' {}".format(NS_URL, NS_LOGIN, NS_PASSWORD, bindir, tfstate_path, tfconfig_local_dir, services, tfconfig_local_dir)
     logger.info("Executing command: " + command)
     try:
-        tf_output = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=True)
-        logger.info(tf_output)
-        upload_tfstate()
+        m = DynamoDbMutex(name=NS_URL, holder=random_name(), timeoutms=40 * 1000)
+        if m.lock():
+            tf_output = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=True)
+            logger.info(tf_output)
+            upload_tfstate()
+            m.release()
+        else:
+            logger.info("Failed to acquire mutex (no-op)")
     except subprocess.CalledProcessError as cpe:
-           logger.info(cpe.output)
-
+        logger.info(cpe.output)
+        m.release()
