@@ -1,5 +1,7 @@
 #!/bin/bash
 
+LAMBDA_ROLE_NAME=ConfigureNetScalerAutoScaleRole
+
 lambda_execution_role_arn=$(aws iam create-role \
   --role-name $LAMBDA_ROLE_NAME \
   --assume-role-policy-document '{

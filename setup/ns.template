@@ -15,7 +15,7 @@
         "VPX": {
             "ConstraintDescription": "Must be a valid EC2 instance type.",
             "Type": "String",
-            "Description": "Primary VPX instance",
+            "Description": "VPX instance",
             "AllowedValues": [
                 "m3.large",
                 "m3.xlarge",
@@ -46,21 +46,16 @@
             "MaxLength": "64",
             "Type": "AWS::EC2::KeyPair::KeyName"
         },
-        "ClientIP": {
-            "Type": "String",
-            "Description": "Private IP assigned to the Client ENI. last octet has to be between 5 and 254. Leave empty for automatic assignment."
-        }
     },
-    "AWSTemplateFormatVersion": "2010-09-09",
     "Outputs": {
         "IPAddressNS": {
-            "Description": "Elastic IP address of the VPX Primary instance associated with NSIP",
+            "Description": "Elastic IP address of the VPX instance associated with NSIP",
             "Value": {
                 "Ref": "EipNsip"
             }
         },
         "InstanceIdNS": {
-            "Description": "Instance Id of newly created Primary VPX instance",
+            "Description": "Instance Id of newly created VPX instance",
             "Value": {
                 "Ref": "VPXInstance"
             }
@@ -191,9 +186,9 @@
             "Properties": {
                 "Tags": [
                     {
-                        "Value": "VPXPrimary",
+                        "Value": "NetScalerVPX",
                         "Key": "Name"
-                    }
+                    },
                 ],
                 "ImageId": {
                     "Fn::FindInMap": [
