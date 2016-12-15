@@ -53,22 +53,27 @@ def fetch_tfstate():
     bucket = os.environ['S3_TFSTATE_BUCKET']
     try:
         s3_client.download_file(bucket, tfstate_key, tfstate_path)
+        logger.info("Downloaded tfstate file to " + tfstate_path)
     except botocore.exceptions.ClientError as e:
         error_code = int(e.response['Error']['Code'])
         if error_code == 404:
             logger.info("Tfstate file does not exist in S3: OK")
         else:
+            logger.info("Exception trying to download tfstate file, error_code=" + str(error_code))
             raise
 
 def fetch_tfconfig():
     bucket = os.environ['S3_TFCONFIG_BUCKET']
     try:
         s3_client.download_file(bucket, tfconfig_key,  tfconfig_path)
+        logger.info("Downloaded tfconfig file to " + tfconfig_path)
         zip_ref = zipfile.ZipFile(tfconfig_path, 'r')
         zip_ref.extractall(tfconfig_local_dir + "../")
         zip_ref.close()
+        logger.info("Unzipped tfconfig file to " + tfconfig_local_dir)
     except botocore.exceptions.ClientError as e:
         error_code = int(e.response['Error']['Code'])
+        logger.info("Exception trying to download tfconfig file, error_code=" + str(error_code))
         if error_code == 404:
             logger.info("TfConfig zip file does not exist in S3: cannot proceed")
         raise
@@ -76,6 +81,7 @@ def fetch_tfconfig():
 def upload_tfstate():
     bucket = os.environ['S3_TFSTATE_BUCKET']
     s3_client.upload_file(tfstate_path, bucket, tfstate_key)
+    logger.info("uploaded tfstate file")
 
 
 def handler(event, context):
@@ -100,6 +106,7 @@ def handler(event, context):
     fetch_tfstate()
     fetch_tfconfig()
     command = "NS_URL={} NS_LOGIN={} NS_PASSWORD={} {}/terraform apply -state={} -backup=- -no-color -var-file={}/terraform.tfvars -var 'backend_services=[{}]' {}".format(NS_URL, NS_LOGIN, NS_PASSWORD, bindir, tfstate_path, tfconfig_local_dir, services, tfconfig_local_dir)
+    logger.info("Executing command: " + command)
     try:
         tf_output = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=True)
         logger.info(tf_output)
