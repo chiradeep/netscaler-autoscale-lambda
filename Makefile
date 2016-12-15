@@ -6,6 +6,7 @@ help:
 	@echo "  package-config      to package the NetScaler Terraform config"
 	@echo "  create-lambda       to create the lambda function in AWS"
 	@echo "  update-lambda       to update the lambda function in AWS"
+	@echo "  test-local          to test locally"
 
 bundle.zip: handler.py bin/terraform-provider-netscaler
 	zip  bundle.zip handler.py bin/*
@@ -40,3 +41,6 @@ test-local:
 	@echo "Testing locally"
 	python-lambda-local -l lib/ -f handler -t 50 handler.py event.json
 
+invoke-lambda:
+	@echo "Invoking Lambda remote"
+	aws lambda invoke --function-name ConfigureNetScaler --log-type Tail outfile.txt | grep LogResult | awk -F" " '{print $$2}' | sed 's/"//g' | sed 's/,//g'  | base64 --decode
