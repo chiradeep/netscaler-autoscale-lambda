@@ -2,6 +2,10 @@
 resource "aws_s3_bucket" "config_bucket" {
     bucket = "${var.s3_config_bucket_name}"
     acl = "private"
+    force_destroy = "true"
+    versioning {
+       enabled = true
+    }
     tags {
         Description = "Holds terraform config that drives NetScaler configuration"
     }
@@ -10,6 +14,10 @@ resource "aws_s3_bucket" "config_bucket" {
 resource "aws_s3_bucket" "state_bucket" {
     bucket = "${var.s3_state_bucket_name}"
     acl = "private"
+    versioning {
+       enabled = true
+    }
+    force_destroy = "true"
     tags {
         Description = "Holds terraform state that reflects NetScaler configuration"
     }
@@ -18,7 +26,7 @@ resource "aws_s3_bucket" "state_bucket" {
 resource "aws_iam_policy" "s3_policy" {
     name = "s3_netscaler_objects_policy"
     path = "/netscaler-auto-scale/"
-    description = "Allows autoscale lambda access to config and statebuckets"
+    description = "Allows autoscale lambda access to config and state buckets"
     policy = <<EOF
 {
   "Version": "2012-10-17",
@@ -31,6 +39,16 @@ resource "aws_iam_policy" "s3_policy" {
          "Effect": "Allow",
          "Action": ["s3:GetObject","s3:PutObject"],
 	 "Resource": "arn:aws:s3:::${var.s3_state_bucket_name}/*"
+        },
+        {
+         "Effect": "Allow",
+         "Action": ["s3:ListBucket"],
+	 "Resource": "arn:aws:s3:::${var.s3_state_bucket_name}"
+        },
+        {
+         "Effect": "Allow",
+         "Action": ["s3:ListBucket"],
+	 "Resource": "arn:aws:s3:::${var.s3_config_bucket_name}"
         }]
 }
 EOF
@@ -73,8 +91,8 @@ resource "aws_iam_policy" "dynamodb_policy" {
 EOF
 }
 
-resource "aws_iam_role" "exec_role_for_lambda" {
-    name = "exec_role_for_lambda"
+resource "aws_iam_role" "role_for_netscaler_autoscale_lambda" {
+    name = "role_for_netscaler_autoscale_lambda"
     assume_role_policy = <<EOF
 {
   "Version": "2012-10-17",
@@ -94,14 +112,31 @@ EOF
 
 resource "aws_security_group" "lambda_security_group" {
   description = "Security group for lambda in VPC"
+  name = "netscaler_autoscale_lambda_sg"
   vpc_id = "${var.netscaler_vpc_id}"
+  egress {
+      from_port = 0
+      to_port = 0
+      protocol = "-1"
+      cidr_blocks = ["0.0.0.0/0"]
+  }
 
+}
+
+resource "aws_security_group_rule" "allow_lambda_access_to_netscaler" {
+    type = "ingress"
+    from_port = 0
+    to_port = 65535
+    protocol = "tcp"
+    source_security_group_id = "${aws_security_group.lambda_security_group.id}"
+
+    security_group_id = "${var.netscaler_security_group_id}"
 }
 
 resource "aws_lambda_function" "netscaler_autoscale_lambda" {
     filename = "../bundle.zip"
     function_name = "netscaler_autoscale_lambda"
-    role = "${aws_iam_role.exec_role_for_lambda.arn}"
+    role = "${aws_iam_role.role_for_netscaler_autoscale_lambda.arn}"
     handler = "handler.handler"
     runtime = "python2.7"
     timeout = 90
@@ -168,26 +203,26 @@ resource "aws_s3_bucket_notification" "bucket_notification" {
 
 
 resource "aws_iam_role_policy_attachment" "lambda-role-auth-dyndb" {
-    role = "${aws_iam_role.exec_role_for_lambda.name}"
+    role = "${aws_iam_role.role_for_netscaler_autoscale_lambda.name}"
     policy_arn = "${aws_iam_policy.dynamodb_policy.arn}"
 }
 
 resource "aws_iam_role_policy_attachment" "lambda-role-auth-s3" {
-    role = "${aws_iam_role.exec_role_for_lambda.name}"
+    role = "${aws_iam_role.role_for_netscaler_autoscale_lambda.name}"
     policy_arn = "${aws_iam_policy.s3_policy.arn}"
 }
 
 resource "aws_iam_role_policy_attachment" "lambda-role-auth-ec2" {
-    role = "${aws_iam_role.exec_role_for_lambda.name}"
+    role = "${aws_iam_role.role_for_netscaler_autoscale_lambda.name}"
     policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
 }
 
 resource "aws_iam_role_policy_attachment" "lambda-role-auth-vpc" {
-    role = "${aws_iam_role.exec_role_for_lambda.name}"
+    role = "${aws_iam_role.role_for_netscaler_autoscale_lambda.name}"
     policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
 
 resource "aws_iam_role_policy_attachment" "lambda-role-auth-exec-lambda" {
-    role = "${aws_iam_role.exec_role_for_lambda.name}"
+    role = "${aws_iam_role.role_for_netscaler_autoscale_lambda.name}"
     policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaRole"
 }

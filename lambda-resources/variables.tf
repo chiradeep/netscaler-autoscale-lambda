@@ -20,6 +20,11 @@ variable "netscaler_vpc_id" {
     "description" = "VPC Id of the NetScaler subnets"
 }
 
+variable "netscaler_security_group_id" {
+    type = "string"
+    "description" = "Security group id of the NetScaler Management interface ENI"
+}
+
 variable "autoscaling_group_backend_name" {
     type = "string"
     "description" = "Name of autoscaling group  that the NetScaler(s) are load balancing to"
