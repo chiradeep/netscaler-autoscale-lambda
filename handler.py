@@ -54,6 +54,28 @@ def fetch_asg_instance_ips():
     return result
 
 
+def find_ns_vpx_instances(subnetid, tagkey, tagvalue):
+    filters = [{'Name': 'tag:{}'.format(tagkey), 'Values': [tagvalue]}]
+    result = []
+    reservations = ec2_client.describe_instances(Filters=filters)
+    for r in reservations["Reservations"]:
+        for instance in r["Instances"]:
+            instance_info = {}
+            instance_id = instance['InstanceId']
+            logger.info("Found NS VPX " + instance_id + ", state=" + instance['State']['Name'])
+            if instance['State']['Name'] != 'running':
+                continue
+            instance_info['instance_id'] = instance_id
+            for intf in instance['NetworkInterfaces']:
+                if intf['SubnetId'] == subnetid:
+                    instance_info['private_ip'] = intf['PrivateIpAddress']
+                    logger.info("NS VPX: " + instance_id + ", private ip=" + intf['PrivateIpAddress'])
+                    result.append(instance_info)
+                    break
+    logger.info("find_ns_vpx_instances:found " +  str(len(result)) + " instances")
+    return result
+
+
 def fetch_tfstate():
     bucket = os.environ['S3_TFSTATE_BUCKET']
     try:
