@@ -136,16 +136,19 @@ def configure_vpx(vpx_info, services):
     command = "NS_URL={} NS_LOGIN={} NS_PASSWORD={} {}/terraform apply -state={} -backup=- -no-color -var-file={}/terraform.tfvars -var 'backend_services=[{}]' {}".format(NS_URL, NS_LOGIN, NS_PASSWORD, bindir, get_tfstate_path(instance_id), tfconfig_local_dir, services, tfconfig_local_dir)
     logger.info("Executing command: " + command)
     try:
-        m = DynamoDbMutex(name=NS_URL, holder=random_name(), timeoutms=40 * 1000)
+        m = DynamoDbMutex(name=instance_id, holder=random_name(), timeoutms=40 * 1000)
         if m.lock():
             tf_output = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=True)
             logger.info(tf_output)
-            upload_tfstate()
+            upload_tfstate(instance_id)
             m.release()
         else:
             logger.info("Failed to acquire mutex (no-op)")
     except subprocess.CalledProcessError as cpe:
         logger.info(cpe.output)
+        m.release()
+    except:
+        logger.info("Caught exception, releasing lock")
         m.release()
 
 
