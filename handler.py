@@ -12,10 +12,8 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 bindir = os.path.join(os.getcwd(), 'bin')
-tfstate_path = "/tmp/terraform.tfstate"
 tfconfig_path = "/tmp/config.zip"
 tfconfig_local_dir = "/tmp/tfconfig/config/"
-tfstate_key = "tfstate"
 tfconfig_key = "config.zip"
 
 s3_client = boto3.client('s3')
@@ -54,7 +52,7 @@ def fetch_asg_instance_ips():
     return result
 
 
-def find_ns_vpx_instances(subnetid, tagkey, tagvalue):
+def find_ns_vpx_instances(subnet_ids, tagkey, tagvalue):
     filters = [{'Name': 'tag:{}'.format(tagkey), 'Values': [tagvalue]}]
     result = []
     reservations = ec2_client.describe_instances(Filters=filters)
@@ -67,8 +65,8 @@ def find_ns_vpx_instances(subnetid, tagkey, tagvalue):
                 continue
             instance_info['instance_id'] = instance_id
             for intf in instance['NetworkInterfaces']:
-                if intf['SubnetId'] == subnetid:
-                    instance_info['private_ip'] = intf['PrivateIpAddress']
+                if intf['SubnetId'] in subnet_ids:
+                    instance_info['ns_url'] = 'http://{}:80/'.format(intf['PrivateIpAddress']) # TODO:https
                     logger.info("NS VPX: " + instance_id + ", private ip=" + intf['PrivateIpAddress'])
                     result.append(instance_info)
                     break
@@ -76,11 +74,17 @@ def find_ns_vpx_instances(subnetid, tagkey, tagvalue):
     return result
 
 
-def fetch_tfstate():
+def get_tfstate_path(instance_id):
+    return '/tmp/terraform.{}.tfstate'.format(instance_id)
+
+def get_tfstate_key(instance_id):
+    return '{}.tfstate'.format(instance_id)
+
+def fetch_tfstate(instance_id):
     bucket = os.environ['S3_TFSTATE_BUCKET']
     try:
-        s3_client.download_file(bucket, tfstate_key, tfstate_path)
-        logger.info("Downloaded tfstate file to " + tfstate_path)
+        s3_client.download_file(bucket, get_tfstate_key(instance_id), get_tfstate_path(instance_id))
+        logger.info("Downloaded tfstate file to " + get_tfstate_path(instance_id))
     except botocore.exceptions.ClientError as e:
         error_code = int(e.response['Error']['Code'])
         if error_code == 404:
@@ -107,18 +111,18 @@ def fetch_tfconfig():
         raise
 
 
-def upload_tfstate():
+def upload_tfstate(instance_id):
     bucket = os.environ['S3_TFSTATE_BUCKET']
-    s3_client.upload_file(tfstate_path, bucket, tfstate_key)
+    s3_client.upload_file(get_tfstate_path(instance_id), bucket, get_tfstate_key(instance_id))
     logger.info("uploaded tfstate file")
 
 
-def handler(event, context):
-
+def configure_vpx(vpx_info, services):
     try:
-        NS_URL = os.environ['NS_URL']
+        NS_URL = vpx_info['ns_url'] 
         NS_LOGIN = os.environ['NS_LOGIN']
-        NS_PASSWORD = os.environ['NS_PASSWORD']
+        NS_PASSWORD = vpx_info['instance_id']
+        instance_id = vpx_info['instance_id']
         state_bucket = os.environ['S3_TFSTATE_BUCKET']
         config_bucket = os.environ['S3_TFCONFIG_BUCKET']
         asg = os.environ['ASG_NAME']
@@ -126,15 +130,10 @@ def handler(event, context):
         logger.info("Bailing since we can't get the required environment vars")
         return
 
-    services = ""
-    for s in fetch_asg_instance_ips():
-        services = services + '"' + s + '",'
-
-    logger.info("Service members are " + services)
-
-    fetch_tfstate()
+    logger.info(vpx_info)
+    fetch_tfstate(vpx_info['instance_id'])
     fetch_tfconfig()
-    command = "NS_URL={} NS_LOGIN={} NS_PASSWORD={} {}/terraform apply -state={} -backup=- -no-color -var-file={}/terraform.tfvars -var 'backend_services=[{}]' {}".format(NS_URL, NS_LOGIN, NS_PASSWORD, bindir, tfstate_path, tfconfig_local_dir, services, tfconfig_local_dir)
+    command = "NS_URL={} NS_LOGIN={} NS_PASSWORD={} {}/terraform apply -state={} -backup=- -no-color -var-file={}/terraform.tfvars -var 'backend_services=[{}]' {}".format(NS_URL, NS_LOGIN, NS_PASSWORD, bindir, get_tfstate_path(instance_id), tfconfig_local_dir, services, tfconfig_local_dir)
     logger.info("Executing command: " + command)
     try:
         m = DynamoDbMutex(name=NS_URL, holder=random_name(), timeoutms=40 * 1000)
@@ -148,3 +147,25 @@ def handler(event, context):
     except subprocess.CalledProcessError as cpe:
         logger.info(cpe.output)
         m.release()
+
+
+def handler(event, context):
+    try:
+        subnet_ids = os.environ['NS_VPX_SUBNET_IDS'].split(',')
+        vpx_tag_key = os.environ['NS_VPX_TAG_KEY']
+        vpx_tag_value = os.environ['NS_VPX_TAG_VALUE']
+        asg = os.environ['ASG_NAME']
+    except:
+        logger.info("Bailing since we can't get the required environment vars")
+        return
+    
+    vpx_instances = find_ns_vpx_instances(subnet_ids, vpx_tag_key, vpx_tag_value)
+    if len(vpx_instances) == 0:
+        logger.info("Couldn't find any VPXs to configure!, Exiting")
+
+    services = ""
+    for s in fetch_asg_instance_ips():
+        services = services + '"' + s + '",'
+
+    for vpx_info in vpx_instances:
+        configure_vpx(vpx_info, services)

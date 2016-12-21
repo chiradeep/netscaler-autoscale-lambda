@@ -144,16 +144,17 @@ resource "aws_lambda_function" "netscaler_autoscale_lambda" {
     source_code_hash = "${base64sha256(file("../bundle.zip"))}"
     environment {
         variables = {
-            NS_URL = "http://172.20.0.9:80/"
-            NS_PASSWORD = "nsroot"
             NS_LOGIN = "nsroot"
+            NS_VPX_TAG_KEY="${var.ns_vpx_tag_key}"
+            NS_VPX_TAG_VALUE="${var.ns_vpx_tag_value}"
+            NS_VPX_SUBNET_IDS="${join(",", var.netscaler_vpc_subnet_ids)}"
             S3_TFSTATE_BUCKET = "${var.s3_state_bucket_name}"
             S3_TFCONFIG_BUCKET = "${var.s3_config_bucket_name}"
             ASG_NAME = "${var.autoscaling_group_backend_name}"
         }
     }
     vpc_config {
-        subnet_ids = "${var.netscaler_vpc_subnets_ids}"
+        subnet_ids = "${var.netscaler_vpc_subnet_ids}"
         security_group_ids = ["${aws_security_group.lambda_security_group.id}"]
     }
 }
