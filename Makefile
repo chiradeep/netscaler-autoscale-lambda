@@ -47,6 +47,9 @@ create-lambda:  package-lambda
 	@echo "create lambda deployment package in AWS"
 	setup/create_lambda.sh
 
+create-lambda-tf: package-lambda
+	@echo "Create lambda and associated resources in AWS using Terraform"
+	(cd lambda-resources; terraform apply)
 
 create-lambda-role:
 	@echo "create lambda execution role"
