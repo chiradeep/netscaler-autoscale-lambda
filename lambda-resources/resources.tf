@@ -54,7 +54,7 @@ resource "aws_iam_policy" "s3_policy" {
 EOF
 }
 
-resource "aws_dynamodb_table" "netscaler-autoscale-mutex" {
+resource "aws_dynamodb_table" "netscaler_autoscale_mutex" {
     name = "NetScalerAutoScaleLambdaMutex"
     read_capacity = 2
     write_capacity = 2
@@ -84,7 +84,7 @@ resource "aws_iam_policy" "dynamodb_policy" {
                 "dynamodb:Query",
                 "dynamodb:UpdateItem"
             ],
-            "Resource": "${aws_dynamodb_table.netscaler-autoscale-mutex.arn}"
+            "Resource": "${aws_dynamodb_table.netscaler_autoscale_mutex.arn}"
         }
     ]
 }
@@ -159,13 +159,13 @@ resource "aws_lambda_function" "netscaler_autoscale_lambda" {
     }
 }
 
-resource "aws_cloudwatch_event_target" "asg-autoscale-trigger-netscaler-lambda" {
-  rule = "${aws_cloudwatch_event_rule.asg-autoscale-events.name}"
+resource "aws_cloudwatch_event_target" "asg_autoscale_trigger_netscaler_lambda" {
+  rule = "${aws_cloudwatch_event_rule.asg_autoscale_events.name}"
   arn = "${aws_lambda_function.netscaler_autoscale_lambda.arn}"
 }
 
-resource "aws_cloudwatch_event_rule" "asg-autoscale-events" {
-  name = "asg-autoscale-events"
+resource "aws_cloudwatch_event_rule" "asg_autoscale_events" {
+  name = "asg_autoscale_events"
   description = "Capture all EC2 scaling events"
   event_pattern = <<PATTERN
 {
@@ -198,7 +198,7 @@ resource "aws_lambda_permission" "cloudwatch_event_to_lambda" {
     action = "lambda:InvokeFunction"
     function_name = "${aws_lambda_function.netscaler_autoscale_lambda.arn}"
     principal = "events.amazonaws.com"
-    source_arn = "${aws_cloudwatch_event_rule.asg-autoscale-events.arn}"
+    source_arn = "${aws_cloudwatch_event_rule.asg_autoscale_events.arn}"
 }
 
 
@@ -211,27 +211,27 @@ resource "aws_s3_bucket_notification" "bucket_notification" {
 }
 
 
-resource "aws_iam_role_policy_attachment" "lambda-role-auth-dyndb" {
+resource "aws_iam_role_policy_attachment" "lambda_role_auth_dyndb" {
     role = "${aws_iam_role.role_for_netscaler_autoscale_lambda.name}"
     policy_arn = "${aws_iam_policy.dynamodb_policy.arn}"
 }
 
-resource "aws_iam_role_policy_attachment" "lambda-role-auth-s3" {
+resource "aws_iam_role_policy_attachment" "lambda_role_auth_s3" {
     role = "${aws_iam_role.role_for_netscaler_autoscale_lambda.name}"
     policy_arn = "${aws_iam_policy.s3_policy.arn}"
 }
 
-resource "aws_iam_role_policy_attachment" "lambda-role-auth-ec2" {
+resource "aws_iam_role_policy_attachment" "lambda_role_auth_ec2" {
     role = "${aws_iam_role.role_for_netscaler_autoscale_lambda.name}"
     policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
 }
 
-resource "aws_iam_role_policy_attachment" "lambda-role-auth-vpc" {
+resource "aws_iam_role_policy_attachment" "lambda_role_auth_vpc" {
     role = "${aws_iam_role.role_for_netscaler_autoscale_lambda.name}"
     policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
 
-resource "aws_iam_role_policy_attachment" "lambda-role-auth-exec-lambda" {
+resource "aws_iam_role_policy_attachment" "lambda_role_auth_exec_lambda" {
     role = "${aws_iam_role.role_for_netscaler_autoscale_lambda.name}"
     policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaRole"
 }
