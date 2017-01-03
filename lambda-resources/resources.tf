@@ -193,6 +193,14 @@ resource "aws_lambda_permission" "s3_config_bucket_to_lambda" {
     source_arn = "${aws_s3_bucket.config_bucket.arn}"
 }
 
+resource "aws_lambda_permission" "cloudwatch_event_to_lambda" {
+    statement_id = "AllowExecutionFromCloudWatchEvent"
+    action = "lambda:InvokeFunction"
+    function_name = "${aws_lambda_function.netscaler_autoscale_lambda.arn}"
+    principal = "events.amazonaws.com"
+    source_arn = "${aws_cloudwatch_event_rule.asg-autoscale-events.arn}"
+}
+
 
 resource "aws_s3_bucket_notification" "bucket_notification" {
     bucket = "${aws_s3_bucket.config_bucket.id}"
