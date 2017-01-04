@@ -31,13 +31,13 @@ source .env
 
 
 ## Creating the lambda function
-To deploy the lambda function, use the Terraform config in (./lambda-resources). Or, use the Makefile:
+To deploy the lambda function, use the Terraform config in [./lambda-resources](./lambda-resources). Or, use the Makefile:
 
 ```
 make  create-lambda
 ```
 
-The terraform config expects a number of inputs such as the VPC configuration, the tag on the NetScaler VPX instance, etc. This can be suppliedon the command line, or in the (./lambda-resources/terraform.tfvars) file. The set of inputs is documented in [./lambda-resources](./lambda-resources/variables.tf).
+The terraform config expects a number of inputs such as the VPC configuration, the tag on the NetScaler VPX instance, etc. This can be suppliedon the command line, or in the [terraform.tfvars](./lambda-resources/terraform.tfvars) file. The set of inputs is documented in [variables.tf](./lambda-resources/variables.tf).
 An example of using the command line:
 
 ```
