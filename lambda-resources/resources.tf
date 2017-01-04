@@ -54,7 +54,13 @@ resource "aws_iam_policy" "s3_policy" {
 EOF
 }
 
-resource "aws_dynamodb_table" "netscaler-autoscale-mutex" {
+
+/*
+ * DyamboDb table that support the mutex that prevents multiple lambda instances 
+ * from configuring NetScaler at the same time
+ */
+
+resource "aws_dynamodb_table" "netscaler_autoscale_mutex" {
     name = "NetScalerAutoScaleLambdaMutex"
     read_capacity = 2
     write_capacity = 2
@@ -84,13 +90,17 @@ resource "aws_iam_policy" "dynamodb_policy" {
                 "dynamodb:Query",
                 "dynamodb:UpdateItem"
             ],
-            "Resource": "${aws_dynamodb_table.netscaler-autoscale-mutex.arn}"
+            "Resource": "${aws_dynamodb_table.netscaler_autoscale_mutex.arn}"
         }
     ]
 }
 EOF
 }
 
+/*
+ * IAM role for the lambda function. Policies that allow the lambda to
+ * access resources such as S3 and DynamoDb will be attached to this role
+ */
 resource "aws_iam_role" "role_for_netscaler_autoscale_lambda" {
     name = "role_for_netscaler_autoscale_lambda"
     assume_role_policy = <<EOF
@@ -110,6 +120,9 @@ resource "aws_iam_role" "role_for_netscaler_autoscale_lambda" {
 EOF
 }
 
+/* The lambda function will execute inside the VPC that the NetScaler is being used
+ * It has an ENI inside the VPC. This ENI needs to be in a security group
+ */
 resource "aws_security_group" "lambda_security_group" {
   description = "Security group for lambda in VPC"
   name = "netscaler_autoscale_lambda_sg"
@@ -123,6 +136,9 @@ resource "aws_security_group" "lambda_security_group" {
 
 }
 
+/* The lambda function needs to be able to access the NetScaler on its management ports
+ * This rule adds to an already existing security group to allow this access
+ */
 resource "aws_security_group_rule" "allow_lambda_access_to_netscaler" {
     type = "ingress"
     from_port = 0
@@ -133,6 +149,12 @@ resource "aws_security_group_rule" "allow_lambda_access_to_netscaler" {
     security_group_id = "${var.netscaler_security_group_id}"
 }
 
+/* Lambda function that uses Terraform to configure the NetScaler
+ * This lambda function executes inside a VPC and reacts to workload autoscaling events 
+ * The VPC subnets and the autoscaling group names are configured using environment variables
+ * These environment variables are taken from the TF inputs to this TF config. Other environment 
+ * variables such as the S3 buckets are derived from other resources in this TF config
+ */
 resource "aws_lambda_function" "netscaler_autoscale_lambda" {
     filename = "../bundle.zip"
     function_name = "netscaler_autoscale_lambda"
@@ -144,27 +166,28 @@ resource "aws_lambda_function" "netscaler_autoscale_lambda" {
     source_code_hash = "${base64sha256(file("../bundle.zip"))}"
     environment {
         variables = {
-            NS_URL = "http://172.20.0.9:80/"
-            NS_PASSWORD = "nsroot"
             NS_LOGIN = "nsroot"
+            NS_PASSWORD="${var.ns_vpx_password}"
+            NS_VPX_TAG_KEY="${var.ns_vpx_tag_key}"
+            NS_VPX_TAG_VALUE="${var.ns_vpx_tag_value}"
+            NS_VPX_SUBNET_IDS="${join(",", var.netscaler_vpc_subnet_ids)}"
             S3_TFSTATE_BUCKET = "${var.s3_state_bucket_name}"
             S3_TFCONFIG_BUCKET = "${var.s3_config_bucket_name}"
             ASG_NAME = "${var.autoscaling_group_backend_name}"
+            DD_MUTEX_TABLE_NAME = "${aws_dynamodb_table.netscaler_autoscale_mutex.name}"
         }
     }
     vpc_config {
-        subnet_ids = "${var.netscaler_vpc_subnets_ids}"
+        subnet_ids = "${var.netscaler_vpc_subnet_ids}"
         security_group_ids = ["${aws_security_group.lambda_security_group.id}"]
     }
 }
 
-resource "aws_cloudwatch_event_target" "asg-autoscale-trigger-netscaler-lambda" {
-  rule = "${aws_cloudwatch_event_rule.asg-autoscale-events.name}"
-  arn = "${aws_lambda_function.netscaler_autoscale_lambda.arn}"
-}
-
-resource "aws_cloudwatch_event_rule" "asg-autoscale-events" {
-  name = "asg-autoscale-events"
+/* CloudWatch Event Rule that captures the autoscaling events in the scaling group
+ * that runs the actual workload
+ */
+resource "aws_cloudwatch_event_rule" "asg_autoscale_events" {
+  name = "asg_autoscale_events"
   description = "Capture all EC2 scaling events"
   event_pattern = <<PATTERN
 {
@@ -184,6 +207,16 @@ resource "aws_cloudwatch_event_rule" "asg-autoscale-events" {
 PATTERN
 }
 
+/* Target the invocation of the lambda function whenever the scaling event happens */
+resource "aws_cloudwatch_event_target" "asg_autoscale_trigger_netscaler_lambda" {
+  rule = "${aws_cloudwatch_event_rule.asg_autoscale_events.name}"
+  arn = "${aws_lambda_function.netscaler_autoscale_lambda.arn}"
+}
+
+
+/* Permit the S3 service to invoke the lambda function whenever there is change 
+ * in the S3 config bucket
+ */
 resource "aws_lambda_permission" "s3_config_bucket_to_lambda" {
     statement_id = "AllowExecutionFromS3Bucket"
     action = "lambda:InvokeFunction"
@@ -192,7 +225,19 @@ resource "aws_lambda_permission" "s3_config_bucket_to_lambda" {
     source_arn = "${aws_s3_bucket.config_bucket.arn}"
 }
 
+/* Permit the CloudWatch events service to invoke the lambda function whenever there is change 
+ * in the autoscaling group
+ */
+resource "aws_lambda_permission" "cloudwatch_event_to_lambda" {
+    statement_id = "AllowExecutionFromCloudWatchEvent"
+    action = "lambda:InvokeFunction"
+    function_name = "${aws_lambda_function.netscaler_autoscale_lambda.arn}"
+    principal = "events.amazonaws.com"
+    source_arn = "${aws_cloudwatch_event_rule.asg_autoscale_events.arn}"
+}
 
+
+/* Invoke the lambda function whenever there is a change in the S3 config bucket */
 resource "aws_s3_bucket_notification" "bucket_notification" {
     bucket = "${aws_s3_bucket.config_bucket.id}"
     lambda_function {
@@ -202,27 +247,42 @@ resource "aws_s3_bucket_notification" "bucket_notification" {
 }
 
 
-resource "aws_iam_role_policy_attachment" "lambda-role-auth-dyndb" {
+/* Attach a policy that authorizes the lambda function to access the 
+ * Dynamodb table that holds the mutex
+ */
+resource "aws_iam_role_policy_attachment" "lambda_role_auth_dyndb" {
     role = "${aws_iam_role.role_for_netscaler_autoscale_lambda.name}"
     policy_arn = "${aws_iam_policy.dynamodb_policy.arn}"
 }
 
-resource "aws_iam_role_policy_attachment" "lambda-role-auth-s3" {
+/* Attach a policy that authorizes the lambda function to access the 
+ * S3 buckets that hold the config and state objects
+ */
+resource "aws_iam_role_policy_attachment" "lambda_role_auth_s3" {
     role = "${aws_iam_role.role_for_netscaler_autoscale_lambda.name}"
     policy_arn = "${aws_iam_policy.s3_policy.arn}"
 }
 
-resource "aws_iam_role_policy_attachment" "lambda-role-auth-ec2" {
+/* Attach a policy that authorizes the lambda function to access the 
+ * EC2 API to read the autoscaling and NetScaler VPX state
+ */
+resource "aws_iam_role_policy_attachment" "lambda_role_auth_ec2" {
     role = "${aws_iam_role.role_for_netscaler_autoscale_lambda.name}"
     policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
 }
 
-resource "aws_iam_role_policy_attachment" "lambda-role-auth-vpc" {
+/* Attach a policy that authorizes the lambda function to execute inside
+ * a VPC. This canned policy also authorizes write access to CloudWatch logs
+ */
+resource "aws_iam_role_policy_attachment" "lambda_role_auth_vpc" {
     role = "${aws_iam_role.role_for_netscaler_autoscale_lambda.name}"
     policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
 
-resource "aws_iam_role_policy_attachment" "lambda-role-auth-exec-lambda" {
+/* Attach a policy that gives  the lambda function basic execution permissions
+ * This is a canned policy
+ */
+resource "aws_iam_role_policy_attachment" "lambda_role_auth_exec_lambda" {
     role = "${aws_iam_role.role_for_netscaler_autoscale_lambda.name}"
     policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaRole"
 }

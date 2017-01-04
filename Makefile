@@ -4,15 +4,16 @@ help:
 	@echo "Please use \`make <target>' where <target> is one of"
 	@echo "  package-lambda      to package the lambda function"
 	@echo "  package-config      to package the NetScaler Terraform config"
+	@echo "  update-config       to upload the NetScaler Terraform config to S3"
 	@echo "  create-lambda       to create the lambda function in AWS"
 	@echo "  update-lambda       to update the lambda function in AWS"
 	@echo "  test-local          to test locally"
 	@echo "  invoke-lambda       to invoke execution in AWS"
 
 dyndbdmutex.py:
-	curl -s -R -S -L -f https://github.com/chiradeep/lambda-mutex/releases/download/v0.1.5/dyndbmutex-0.1.5.tar.gz -z dyndbmutex.py -o dyndbmutex-0.1.5.tar.gz
-	tar --strip-components=2 -xvzf dyndbmutex-0.1.5.tar.gz dyndbmutex-0.1.5/dyndbmutex/dyndbmutex.py
-	rm -f dyndbmutex-0.1.5.tar.gz
+	curl -s -R -S -L -f https://github.com/chiradeep/lambda-mutex/releases/download/v0.20/dyndbmutex-0.2.0.tar.gz  -z dyndbmutex.py -o dyndbmutex-0.2.0.tar.gz
+	tar --strip-components=2 -xvzf dyndbmutex-0.2.0.tar.gz dyndbmutex-0.2.0/dyndbmutex/dyndbmutex.py
+	rm -f dyndbmutex-0.2.0.tar.gz
 
 terraform-binary:
 	mkdir -p ./bin
@@ -41,13 +42,9 @@ update-config: package-config
 
 update-lambda:  package-lambda
 	@echo "update lambda deployment package"
-	aws lambda update-function-code  --function-name ConfigureNetScaler --zip-file fileb://${PWD}/bundle.zip
+	aws lambda update-function-code  --function-name ${LAMBDA_FUNCTION_NAME} --zip-file fileb://${PWD}/bundle.zip
 
-create-lambda:  package-lambda
-	@echo "create lambda deployment package in AWS"
-	setup/create_lambda.sh
-
-create-lambda-tf: package-lambda
+create-lambda: package-lambda
 	@echo "Create lambda and associated resources in AWS using Terraform"
 	(cd lambda-resources; terraform apply)
 
@@ -61,4 +58,4 @@ test-local:
 
 invoke-lambda:
 	@echo "Invoking Lambda remote"
-	aws lambda invoke --function-name ConfigureNetScaler --log-type Tail outfile.txt | grep LogResult | awk -F" " '{print $$2}' | sed 's/"//g' | sed 's/,//g'  | base64 --decode
+	aws lambda invoke --function-name ${LAMBDA_FUNCTION_NAME} --log-type Tail outfile.txt | grep LogResult | awk -F" " '{print $$2}' | sed 's/"//g' | sed 's/,//g'  | base64 --decode
