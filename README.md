@@ -55,6 +55,9 @@ make update-config
 
 This should upload a `config.zip` file to the S3 config bucket, which should then trigger the lambda function.
 
+# Workflow
+Once the lambda function is created and the initial terraform config has been uploaded, the DevOps team can make changes to the config using `make update-config`. An alternative is to have a separate git repository for the config and use Git webhooks to update `config.zip` in the S3 bucket. Github webhooks can be [automated using](https://aws.amazon.com/blogs/compute/dynamic-github-actions-with-aws-lambda/) AWS lambda as well.
+
 # Troubleshooting
 Use CloudWatch logs to troubleshoot. The output of `terraform apply` is buried between the mutex acquire and release logs.
 
@@ -73,3 +76,8 @@ The monetary cost should be negligible:
 
 # Cleanup
 Use `terraform destroy` to destroy the resources created by `make create-lambda`.
+
+# TODO
+
+* Add SNS notifications on failure
+* Create custom cloudwatch metrics such as number of mutex acquisition failures.
