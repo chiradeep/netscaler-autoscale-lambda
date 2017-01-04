@@ -67,7 +67,7 @@ Testing locally using `make test-local` is a little bit involved. You have to se
 
 
 # Resources used
-The monetary cost should be negligible:
+The monetary cost should be zero or close to it.
 
 * A DynamoDB table to hold the mutex (low throughput: 2 writes/sec)
 * Lambda execution. The number of executions is controlled by the number of scaling events and the number of config changes. Generally this should be in the free tier.
