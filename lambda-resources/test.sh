@@ -1,1 +1,0 @@
-terraform apply -var 'autoscaling_group_backend_name=K8S-minion-group-us-west-2a' -var 'netscaler_vpc_id=vpc-094ebf6e' -var 'netscaler_vpc_subnet_ids=["subnet-2412e143"]' -var 'netscaler_security_group_id=sg-c36b19ba'
