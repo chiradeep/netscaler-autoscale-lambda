@@ -4,6 +4,7 @@ help:
 	@echo "Please use \`make <target>' where <target> is one of"
 	@echo "  package-lambda      to package the lambda function"
 	@echo "  package-config      to package the NetScaler Terraform config"
+	@echo "  update-config       to upload the NetScaler Terraform config to S3"
 	@echo "  create-lambda       to create the lambda function in AWS"
 	@echo "  update-lambda       to update the lambda function in AWS"
 	@echo "  test-local          to test locally"
@@ -43,11 +44,7 @@ update-lambda:  package-lambda
 	@echo "update lambda deployment package"
 	aws lambda update-function-code  --function-name ${LAMBDA_FUNCTION_NAME} --zip-file fileb://${PWD}/bundle.zip
 
-create-lambda:  package-lambda
-	@echo "create lambda deployment package in AWS"
-	setup/create_lambda.sh
-
-create-lambda-tf: package-lambda
+create-lambda: package-lambda
 	@echo "Create lambda and associated resources in AWS using Terraform"
 	(cd lambda-resources; terraform apply)
 
