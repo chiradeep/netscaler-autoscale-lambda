@@ -10,6 +10,9 @@ from dyndbmutex import DynamoDbMutex
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+logging.getLogger('boto3').setLevel(logging.WARNING)
+logging.getLogger('botocore').setLevel(logging.WARNING)
+logging.getLogger('dyndbmutex').setLevel(logging.INFO)
 
 bindir = os.path.join(os.getcwd(), 'bin')
 tfconfig_path = "/tmp/config.zip"
@@ -19,6 +22,8 @@ tfconfig_key = "config.zip"
 s3_client = boto3.client('s3')
 asg_client = boto3.client('autoscaling')
 ec2_client = boto3.client('ec2')
+
+
 
 
 def random_name():
@@ -121,7 +126,10 @@ def configure_vpx(vpx_info, services):
     try:
         NS_URL = vpx_info['ns_url'] 
         NS_LOGIN = os.environ['NS_LOGIN']
-        NS_PASSWORD = vpx_info['instance_id']
+        NS_PASSWORD = os.environ.get('NS_PASSWORD')
+        if NS_PASSWORD is None or NS_PASSWORD == 'SAME_AS_INSTANCE_ID':
+            NS_PASSWORD = vpx_info['instance_id']
+
         instance_id = vpx_info['instance_id']
         state_bucket = os.environ['S3_TFSTATE_BUCKET']
         config_bucket = os.environ['S3_TFCONFIG_BUCKET']
