@@ -152,8 +152,7 @@ resource "aws_security_group_rule" "allow_lambda_access_to_netscaler" {
 /* Lambda function that uses Terraform to configure the NetScaler
  * This lambda function executes inside a VPC and reacts to workload autoscaling events 
  * The VPC subnets and the autoscaling group names are configured using environment variables
- * These environment variables are taken from the TF inputs to this TF config. Other environment 
- * variables such as the S3 buckets are derived from other resources in this TF config
+ * These environment variables are taken from the TF inputs to this TF config. 
  */
 resource "aws_lambda_function" "netscaler_autoscale_lambda" {
     filename = "../bundle.zip"
