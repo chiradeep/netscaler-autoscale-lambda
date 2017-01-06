@@ -17,7 +17,7 @@ dyndbdmutex.py:
 
 terraform-binary:
 	mkdir -p ./bin
-	curl -s -R -S -L -f https://github.com/citrix/terraform-provider-netscaler/releases/download/v0.8.1/terraform-provider-netscaler-linux-amd64.tar.gz -z bin/terraform-provider-netscaler-linux-amd64.tar.gz -o bin/terraform-provider-netscaler-linux-amd64.tar.gz
+	curl -s -R -S -L -f https://github.com/citrix/terraform-provider-netscaler/releases/download/v0.8.2/terraform-provider-netscaler-linux-amd64.tar.gz -z bin/terraform-provider-netscaler-linux-amd64.tar.gz -o bin/terraform-provider-netscaler-linux-amd64.tar.gz
 	curl -s -S -L -f https://releases.hashicorp.com/terraform/0.8.1/terraform_0.8.1_linux_amd64.zip -z bin/terraform_0.8.1_linux_amd64.zip -o bin/terraform_0.8.1_linux_amd64.zip
 	(cd bin; tar xvzf terraform-provider-netscaler-linux-amd64.tar.gz)
 	(cd bin; unzip -o terraform_0.8.1_linux_amd64.zip)

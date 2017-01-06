@@ -20,6 +20,9 @@ tfconfig_path = "/tmp/config.zip"
 tfconfig_local_dir = "/tmp/tfconfig/config/"
 tfconfig_key = "config.zip"
 
+# tf_log = "TF_LOG=DEBUG"
+tf_log = ""
+
 s3_client = boto3.client('s3')
 asg_client = boto3.client('autoscaling')
 ec2_client = boto3.client('ec2')
@@ -57,7 +60,7 @@ def fetch_asg_instance_ips(asg):
     return result
 
 
-def find_ns_vpx_instances(subnet_ids, tagkey, tagvalue):
+def find_ns_vpx_instances(subnet_ids, tagkey, tagvalue, eni_descr):
     filters = [{'Name': 'tag:{}'.format(tagkey), 'Values': [tagvalue]}]
     result = []
     reservations = ec2_client.describe_instances(Filters=filters)
@@ -70,13 +73,21 @@ def find_ns_vpx_instances(subnet_ids, tagkey, tagvalue):
             if instance['State']['Name'] != 'running':
                 continue
             instance_info['instance_id'] = instance_id
-            for intf in instance['NetworkInterfaces']:
-                if intf['SubnetId'] in subnet_ids:
-                    instance_info['ns_url'] = 'http://{}:80/'.format(intf['PrivateIpAddress'])  # TODO:https
-                    logger.info("NS instance: " + instance_id +
-                                ", private ip=" + intf['PrivateIpAddress'])
-                    result.append(instance_info)
-                    break
+            for eni in instance['NetworkInterfaces']:
+                logger.info("Found ENI for instance " + instance_id + ", id=" +
+                            eni['NetworkInterfaceId'] + ", descr=" +
+                            eni['Description'] + ", subnet=" + eni['SubnetId'])
+                if eni['SubnetId'] in subnet_ids:
+                    logger.info("ENI matches subnet id=" + eni['NetworkInterfaceId'] + ", ENI id=" + eni['NetworkInterfaceId'])
+                    if eni['Description'] == eni_descr:
+                        logger.info("ENI description matches ENI id=" +
+                                    eni['NetworkInterfaceId'] +
+                                    ", ip=" + eni['PrivateIpAddress'])
+                        instance_info['ns_url'] = 'http://{}:80/'.format(eni['PrivateIpAddress'])  # TODO:https
+                        logger.info("NS instance: " + instance_id +
+                                    ", private ip=" + eni['PrivateIpAddress'])
+                        result.append(instance_info)
+                        break
     logger.info("find_ns_vpx_instances:found " + str(len(result)) +
                 " instances")
     return result
@@ -153,7 +164,7 @@ def configure_vpx(vpx_info, services):
     logger.info(vpx_info)
     fetch_tfstate(state_bucket, instance_id)
     fetch_tfconfig(config_bucket)
-    command = "NS_URL={} NS_LOGIN={} NS_PASSWORD={} {}/terraform apply -state={} -backup=- -no-color -var-file={}/terraform.tfvars -var 'backend_services=[{}]' {}".format(NS_URL, NS_LOGIN, NS_PASSWORD, bindir, get_tfstate_path(instance_id), tfconfig_local_dir, services, tfconfig_local_dir)
+    command = "{} NS_URL={} NS_LOGIN={} NS_PASSWORD={} {}/terraform apply -state={} -backup=- -no-color -var-file={}/terraform.tfvars -var 'backend_services=[{}]' {}".format(tf_log, NS_URL, NS_LOGIN, NS_PASSWORD, bindir, get_tfstate_path(instance_id), tfconfig_local_dir, services, tfconfig_local_dir)
     logger.info("****Executing on NetScaler: " + instance_id +
                 " command: " + command)
     try:
@@ -184,6 +195,7 @@ def handler(event, context):
         subnet_ids = os.environ['NS_VPX_SUBNET_IDS'].split(',')
         vpx_tag_key = os.environ['NS_VPX_TAG_KEY']
         vpx_tag_value = os.environ['NS_VPX_TAG_VALUE']
+        nsip_eni_description = os.environ['NS_VPX_NSIP_ENI_DESCR']
         asg = os.environ['ASG_NAME']
     except KeyError as ke:
         logger.warn("Bailing since we can't get the required env var: " +
@@ -191,7 +203,7 @@ def handler(event, context):
         return
 
     vpx_instances = find_ns_vpx_instances(subnet_ids, vpx_tag_key,
-                                          vpx_tag_value)
+                                          vpx_tag_value, nsip_eni_description)
     if len(vpx_instances) == 0:
         logger.warn("No NetScaler instances to configure!, Exiting")
         return

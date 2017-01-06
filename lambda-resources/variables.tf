@@ -42,6 +42,12 @@ variable "ns_vpx_tag_value" {
 
 variable "ns_vpx_password" {
     type = "string"
-    description = "Password for the nsroot account on the NetScaler"
+    description = "Password for the nsroot account on the NetScaler. In the cloud it is usually the instance id"
     default = "SAME_AS_INSTANCE_ID"
+}
+
+variable "ns_vpx_nsip_eni_description" {
+    type = "string"
+    description = "The description attached to the ENI of the NetScaler that hosts the management interface (NSIP). We use this to determine the the management NSIP of the VPX. Citrix CloudFormation templates usually give this a default value listed below"
+    default = "ENI connected to NSIP subnet"
 }
