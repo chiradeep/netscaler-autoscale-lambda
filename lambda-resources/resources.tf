@@ -170,7 +170,9 @@ resource "aws_lambda_function" "netscaler_autoscale_lambda" {
             NS_VPX_TAG_KEY="${var.ns_vpx_tag_key}"
             NS_VPX_TAG_VALUE="${var.ns_vpx_tag_value}"
             NS_VPX_NSIP_ENI_DESCR="${var.ns_vpx_nsip_eni_description}"
-            NS_VPX_SUBNET_IDS="${join(",", var.netscaler_vpc_subnet_ids)}"
+            NS_VPX_CLIENT_ENI_DESCR="${var.ns_vpx_client_eni_description}"
+            NS_VPX_NSIP_SUBNET_IDS="${join(",", var.netscaler_vpc_nsip_subnet_ids)}"
+            NS_VPX_CLIENT_SUBNET_IDS="${join(",", var.netscaler_vpc_client_subnet_ids)}"
             S3_TFSTATE_BUCKET = "${var.s3_state_bucket_name}"
             S3_TFCONFIG_BUCKET = "${var.s3_config_bucket_name}"
             ASG_NAME = "${var.autoscaling_group_backend_name}"
@@ -178,7 +180,7 @@ resource "aws_lambda_function" "netscaler_autoscale_lambda" {
         }
     }
     vpc_config {
-        subnet_ids = "${var.netscaler_vpc_subnet_ids}"
+        subnet_ids = "${var.netscaler_vpc_nsip_subnet_ids}"
         security_group_ids = ["${aws_security_group.lambda_security_group.id}"]
     }
 }

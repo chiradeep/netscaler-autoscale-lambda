@@ -60,7 +60,8 @@ def fetch_asg_instance_ips(asg):
     return result
 
 
-def find_ns_vpx_instances(subnet_ids, tagkey, tagvalue, eni_descr):
+def find_ns_vpx_instances(tagkey, tagvalue, nsip_subnet_ids, client_subnet_ids,
+                          eni_nsip_descr, eni_client_descr):
     filters = [{'Name': 'tag:{}'.format(tagkey), 'Values': [tagvalue]}]
     result = []
     reservations = ec2_client.describe_instances(Filters=filters)
@@ -77,17 +78,27 @@ def find_ns_vpx_instances(subnet_ids, tagkey, tagvalue, eni_descr):
                 logger.info("Found ENI for instance " + instance_id + ", id=" +
                             eni['NetworkInterfaceId'] + ", descr=" +
                             eni['Description'] + ", subnet=" + eni['SubnetId'])
-                if eni['SubnetId'] in subnet_ids:
-                    logger.info("ENI matches subnet id=" + eni['NetworkInterfaceId'] + ", ENI id=" + eni['NetworkInterfaceId'])
-                    if eni['Description'] == eni_descr:
-                        logger.info("ENI description matches ENI id=" +
+                if eni['SubnetId'] in client_subnet_ids:
+                    logger.info("ENI matches client subnet id=" +
+                                eni['NetworkInterfaceId'] + ", ENI id=" +
+                                eni['NetworkInterfaceId'])
+                    if eni['Description'] == eni_client_descr:
+                        logger.info("ENI description matches client ENI id=" +
+                                    eni['NetworkInterfaceId'] +
+                                    ", ip=" + eni['PrivateIpAddress'])
+                        instance_info['vip'] = eni['PrivateIpAddress']
+                if eni['SubnetId'] in nsip_subnet_ids:
+                    logger.info("ENI matches nsip subnet id=" +
+                                eni['NetworkInterfaceId'] + ", ENI id=" + eni['NetworkInterfaceId'])
+                    if eni['Description'] == eni_nsip_descr:
+                        logger.info("ENI description matches nsip ENI id=" +
                                     eni['NetworkInterfaceId'] +
                                     ", ip=" + eni['PrivateIpAddress'])
                         instance_info['ns_url'] = 'http://{}:80/'.format(eni['PrivateIpAddress'])  # TODO:https
                         logger.info("NS instance: " + instance_id +
-                                    ", private ip=" + eni['PrivateIpAddress'])
+                                    ", nsip ip=" + eni['PrivateIpAddress'])
                         result.append(instance_info)
-                        break
+
     logger.info("find_ns_vpx_instances:found " + str(len(result)) +
                 " instances")
     return result
@@ -161,10 +172,15 @@ def configure_vpx(vpx_info, services):
                     ke.args[0])
         return
 
+    vip_config = ''
+    vip = vpx_info.get('vip')
+    if vip is not None:
+        vip_config = "-var '" + 'vip_config={{vip="{}"}}'.format(vip) + "'"
+
     logger.info(vpx_info)
     fetch_tfstate(state_bucket, instance_id)
     fetch_tfconfig(config_bucket)
-    command = "{} NS_URL={} NS_LOGIN={} NS_PASSWORD={} {}/terraform apply -state={} -backup=- -no-color -var-file={}/terraform.tfvars -var 'backend_services=[{}]' {}".format(tf_log, NS_URL, NS_LOGIN, NS_PASSWORD, bindir, get_tfstate_path(instance_id), tfconfig_local_dir, services, tfconfig_local_dir)
+    command = "{} NS_URL={} NS_LOGIN={} NS_PASSWORD={} {}/terraform apply -state={} -backup=- -no-color -var-file={}/terraform.tfvars -var 'backend_services=[{}]' {} {}".format(tf_log, NS_URL, NS_LOGIN, NS_PASSWORD, bindir, get_tfstate_path(instance_id), tfconfig_local_dir, services, vip_config, tfconfig_local_dir)
     logger.info("****Executing on NetScaler: " + instance_id +
                 " command: " + command)
     try:
@@ -192,18 +208,21 @@ def configure_vpx(vpx_info, services):
 
 def handler(event, context):
     try:
-        subnet_ids = os.environ['NS_VPX_SUBNET_IDS'].split(',')
+        nsip_subnet_ids = os.environ['NS_VPX_NSIP_SUBNET_IDS'].split(',')
+        client_subnet_ids = os.environ['NS_VPX_CLIENT_SUBNET_IDS'].split(',')
         vpx_tag_key = os.environ['NS_VPX_TAG_KEY']
         vpx_tag_value = os.environ['NS_VPX_TAG_VALUE']
         nsip_eni_description = os.environ['NS_VPX_NSIP_ENI_DESCR']
+        client_eni_description = os.environ['NS_VPX_CLIENT_ENI_DESCR']
         asg = os.environ['ASG_NAME']
     except KeyError as ke:
         logger.warn("Bailing since we can't get the required env var: " +
                     ke.args[0])
         return
 
-    vpx_instances = find_ns_vpx_instances(subnet_ids, vpx_tag_key,
-                                          vpx_tag_value, nsip_eni_description)
+    vpx_instances = find_ns_vpx_instances(vpx_tag_key, vpx_tag_value,
+                                          nsip_subnet_ids, client_subnet_ids,
+                                          nsip_eni_description, client_eni_description)
     if len(vpx_instances) == 0:
         logger.warn("No NetScaler instances to configure!, Exiting")
         return

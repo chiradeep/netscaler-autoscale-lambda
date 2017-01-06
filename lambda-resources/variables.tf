@@ -10,9 +10,14 @@ variable "s3_state_bucket_name"{
     description = "The name of the S3 bucket that stores the terraform state file(s) associated with the NetScaler(s)"
 }
 
-variable "netscaler_vpc_subnet_ids" {
+variable "netscaler_vpc_nsip_subnet_ids" {
     type = "list"
     description = "List of subnet ids, e.g., subnet-1abcdef,subnet-2defaae that host the management NIC(s) of the NetScalers"
+}
+
+variable "netscaler_vpc_client_subnet_ids" {
+    type = "list"
+    description = "List of subnet ids, e.g., subnet-1abcdef,subnet-2defaae that host the client-side NIC(s) of the NetScalers"
 }
 
 variable "netscaler_vpc_id" {
@@ -50,4 +55,10 @@ variable "ns_vpx_nsip_eni_description" {
     type = "string"
     description = "The description attached to the ENI of the NetScaler that hosts the management interface (NSIP). We use this to determine the the management NSIP of the VPX. Citrix CloudFormation templates usually give this a default value listed below"
     default = "ENI connected to NSIP subnet"
+}
+
+variable "ns_vpx_client_eni_description" {
+    type = "string"
+    description = "The description attached to the ENI of the NetScaler that hosts the client interface (VIP). We use this to determine the VIP of the VPX. Citrix CloudFormation templates usually give this a default value listed below"
+    default = "ENI connected to client subnet"
 }

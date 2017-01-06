@@ -41,7 +41,7 @@ The terraform config expects a number of inputs such as the VPC configuration, t
 An example of using the command line:
 
 ```
-terraform apply -var 'autoscaling_group_backend_name=my-scaling-group' -var 'netscaler_vpc_id=vpc-a71cb1de' -var 'netscaler_vpc_subnet_ids=["subnet-3abce531"]' -var 'netscaler_security_group_id=sg-a34d49ab'
+terraform apply -var 'autoscaling_group_backend_name=webservers-us-west-2a' -var 'netscaler_vpc_id=vpc-094ebf6e' -var 'netscaler_vpc_nsip_subnet_ids=["subnet-28e20d61"]' -var 'netscaler_vpc_client_subnet_ids=["subnet-953f09e3"]' -var 'netscaler_security_group_id=sg-c36b19ba'
 ```
 
 Make sure the `s3_config_bucket_name` variable matches the `S3_TFCONFIG_BUCKET` enviroment variable.
@@ -53,7 +53,7 @@ The Terraform config that configures the NetScaler should be in the [./config](.
 make update-config
 ```
 
-This should upload a `config.zip` file to the S3 config bucket, which should then trigger the lambda function.
+This should upload a `config.zip` file to the S3 config bucket, which should then trigger the lambda function. Of note is the variable `vip_config` - if the terraform config has this map variable, then the key `vip` in the map will be set to the IP of the client ENI of the NetScaler.
 
 # Workflow
 Once the lambda function is created and the initial terraform config has been uploaded, the DevOps team can make changes to the config using `make update-config`. An alternative is to have a separate git repository for the config and use Git webhooks to update `config.zip` in the S3 bucket. Github webhooks can be [automated using](https://aws.amazon.com/blogs/compute/dynamic-github-actions-with-aws-lambda/) AWS lambda as well.
@@ -81,3 +81,6 @@ Use `terraform destroy` to destroy the resources created by `make create-lambda`
 
 * Add SNS notifications on failure
 * Create custom cloudwatch metrics such as number of mutex acquisition failures.
+
+# Limitations
+* Only 1 IP per NetScaler client ENI is supported. If you have secondary IPs for the Client ENI then you have to change `handler.py` and your terraform config appropriately (see `find_ns_vpx_instances()`). For example you can modify the code to read in the IP from an environment variable instead of auto-discovering it from the client ENI's primary IP.
