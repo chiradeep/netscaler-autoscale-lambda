@@ -45,7 +45,7 @@
             "AllowedPattern": "[-_ a-zA-Z0-9]*",
             "MaxLength": "64",
             "Type": "AWS::EC2::KeyPair::KeyName"
-        },
+        }
     },
     "Outputs": {
         "InstanceIdNS": {
@@ -76,7 +76,7 @@
                     {
                         "Value": "ServerENI",
                         "Key": "Purpose"
-                    },
+                    }
                 ]
             }
         },
@@ -96,7 +96,7 @@
                     {
                         "Value": "NsipENI",
                         "Key": "Purpose"
-                    },
+                    }
                 ]
             }
         },
@@ -116,7 +116,7 @@
                     {
                         "Value": "ClientENI",
                         "Key": "Purpose"
-                    },
+                    }
                 ]
             }
         },
@@ -184,7 +184,7 @@
                     {
                         "Value": "nsvpx",
                         "Key": "Purpose"
-                    },
+                    }
                 ],
                 "ImageId": {
                     "Fn::FindInMap": [
