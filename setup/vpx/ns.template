@@ -53,6 +53,18 @@
             "Value": {
                 "Ref": "VPXInstance"
             }
+        },
+        "PublicIP": {
+            "Description": "Public IP of the Client ENI",
+            "Value": {
+                 "Fn::GetAtt" : [ "VPXInstance", "PublicIp" ]
+            }
+        },
+        "ClientIP": {
+            "Description": "Private IP of the Client ENI",
+            "Value": {
+                 "Fn::GetAtt" : [ "ClientENI", "PrimaryPrivateIpAddress" ]
+            }
         }
     },
 
@@ -60,6 +72,26 @@
     },
 
     "Resources": {
+        "ClientSecurityGroup" : {
+           "Type" : "AWS::EC2::SecurityGroup",
+           "Properties" : {
+              "GroupDescription" : "Allow http/s to Client ENI from Internet",
+              "VpcId" : {"Ref" : "VpcID"},
+              "SecurityGroupIngress" : [{
+                    "IpProtocol" : "tcp",
+                    "FromPort" : "80",
+                    "ToPort" : "80",
+                    "CidrIp" : "0.0.0.0/0"
+                 },
+                 {
+                    "IpProtocol" : "tcp",
+                    "FromPort" : "443",
+                    "ToPort" : "443",
+                    "CidrIp" : "0.0.0.0/0"
+                 }]
+           }
+        },
+
         "ServerENI": {
             "Type": "AWS::EC2::NetworkInterface",
             "Properties": {
@@ -108,7 +140,7 @@
                 },
                 "GroupSet": [
                     {
-                        "Ref": "SecurityGroup"
+                        "Ref": "ClientSecurityGroup"
                     }
                 ],
                 "Description": "ENI connected to client subnet",

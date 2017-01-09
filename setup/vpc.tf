@@ -1,7 +1,7 @@
 module "vpc" {
   source = "github.com/terraform-community-modules/tf_aws_vpc"
 
-  name = "sample-ns-autoscale"
+  name = "qa-ns-autoscale"
 
   cidr = "172.90.0.0/16"
   private_subnets = ["172.90.1.0/24"]
