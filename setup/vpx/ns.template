@@ -55,9 +55,9 @@
             }
         },
         "PublicIP": {
-            "Description": "Public IP of the Client ENI",
+            "Description": "Elastic IP address of the VPX instance associated with Client ENI (VIP)",
             "Value": {
-                 "Fn::GetAtt" : [ "VPXInstance", "PublicIp" ]
+                "Ref": "EipClientIp"
             }
         },
         "ClientIP": {
@@ -264,6 +264,26 @@
                         }
                     }
                 ]
+            }
+        },
+        "EipClientIp": {
+            "Type": "AWS::EC2::EIP",
+            "Properties": {
+                "Domain": "vpc"
+            }
+        },
+        "AssociateEipClientIp": {
+            "Type": "AWS::EC2::EIPAssociation",
+            "Properties": {
+                "NetworkInterfaceId": {
+                    "Ref": "ClientENI"
+                },
+                "AllocationId": {
+                    "Fn::GetAtt": [
+                        "EipClientIp",
+                        "AllocationId"
+                    ]
+                }
             }
         }
 

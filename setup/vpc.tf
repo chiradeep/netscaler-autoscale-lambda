@@ -12,5 +12,5 @@ module "vpc" {
   enable_dns_hostnames = "true"
   enable_dns_support = "true"
 
-  azs      = ["us-west-2c"]
+  azs      = ["${data.aws_availability_zones.available.names[1]}"]
 }

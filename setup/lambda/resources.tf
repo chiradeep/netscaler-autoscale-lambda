@@ -37,22 +37,22 @@ resource "aws_iam_policy" "s3_policy" {
   "Statement": [{
         "Effect": "Allow",
         "Action": ["s3:GetObject"],
-	"Resource": "arn:aws:s3:::${var.s3_config_bucket_name}/*"
+	"Resource": "${aws_s3_bucket.config_bucket.arn}/*"
         }, 
         {
          "Effect": "Allow",
          "Action": ["s3:GetObject","s3:PutObject"],
-	 "Resource": "arn:aws:s3:::${var.s3_state_bucket_name}/*"
+	 "Resource": "${aws_s3_bucket.state_bucket.arn}/*"
         },
         {
          "Effect": "Allow",
          "Action": ["s3:ListBucket"],
-	 "Resource": "arn:aws:s3:::${var.s3_state_bucket_name}"
+	 "Resource": "${aws_s3_bucket.state_bucket.arn}/*"
         },
         {
          "Effect": "Allow",
          "Action": ["s3:ListBucket"],
-	 "Resource": "arn:aws:s3:::${var.s3_config_bucket_name}"
+	 "Resource": "${aws_s3_bucket.config_bucket.arn}/*"
         }]
 }
 EOF
@@ -177,8 +177,8 @@ resource "aws_lambda_function" "netscaler_autoscale_lambda" {
             NS_VPX_CLIENT_ENI_DESCR="${var.ns_vpx_client_eni_description}"
             NS_VPX_NSIP_SUBNET_IDS="${join(",", var.netscaler_vpc_nsip_subnet_ids)}"
             NS_VPX_CLIENT_SUBNET_IDS="${join(",", var.netscaler_vpc_client_subnet_ids)}"
-            S3_TFSTATE_BUCKET = "${var.s3_state_bucket_name}"
-            S3_TFCONFIG_BUCKET = "${var.s3_config_bucket_name}"
+            S3_TFSTATE_BUCKET = "${aws_s3_bucket.state_bucket.id}"
+            S3_TFCONFIG_BUCKET = "${aws_s3_bucket.config_bucket.id}"
             ASG_NAME = "${var.autoscaling_group_backend_name}"
             DD_MUTEX_TABLE_NAME = "${aws_dynamodb_table.netscaler_autoscale_mutex.name}"
         }

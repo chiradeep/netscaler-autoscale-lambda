@@ -7,7 +7,7 @@ module "lambda" {
   netscaler_vpc_client_subnet_ids = "${module.vpc.public_subnets}"
   netscaler_security_group_id = "${module.vpc.default_security_group_id}"
 
-  autoscaling_group_backend_name = "my-autoscale-group"
+  autoscaling_group_backend_name = "${module.asg.asg_name}"
 
   /* the following are taken from the CloudFormation template in vpx/ns.template */
   ns_vpx_tag_key  = "Name"
