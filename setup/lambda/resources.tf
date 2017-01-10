@@ -27,6 +27,14 @@ resource "aws_s3_bucket" "state_bucket" {
     }
 }
 
+resource "aws_s3_bucket_object" "config_zip" {
+    bucket = "${aws_s3_bucket.config_bucket.id}"
+    key = "config.zip"
+    source = "${path.module}/../../config.zip"
+    etag = "${md5(file("${path.module}/../../config.zip"))}"
+}
+
+
 resource "aws_iam_policy" "s3_policy" {
     name = "${var.name}-s3_netscaler_objects_policy"
     path = "/netscaler-auto-scale/"
@@ -47,12 +55,12 @@ resource "aws_iam_policy" "s3_policy" {
         {
          "Effect": "Allow",
          "Action": ["s3:ListBucket"],
-	 "Resource": "${aws_s3_bucket.state_bucket.arn}/*"
+	 "Resource": "${aws_s3_bucket.state_bucket.arn}"
         },
         {
          "Effect": "Allow",
          "Action": ["s3:ListBucket"],
-	 "Resource": "${aws_s3_bucket.config_bucket.arn}/*"
+	 "Resource": "${aws_s3_bucket.config_bucket.arn}"
         }]
 }
 EOF
