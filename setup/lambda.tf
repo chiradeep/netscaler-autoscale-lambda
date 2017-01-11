@@ -1,7 +1,7 @@
 module "lambda" {
   source = "./lambda"
 
-  name = "qa"
+  name = "${var.base_name}"
   netscaler_vpc_id = "${module.vpc.vpc_id}"
   netscaler_vpc_nsip_subnet_ids = "${module.vpc.private_subnets}"
   netscaler_vpc_client_subnet_ids = "${module.vpc.public_subnets}"

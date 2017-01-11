@@ -1,7 +1,7 @@
 module "vpx" {
   source = "./vpx"
 
-  name = "qa"
+  name = "${var.base_name}"
   vpx_size = "m3.large"
   security_group_id = "${module.vpc.default_security_group_id}"
   client_subnet = "${module.vpc.public_subnets[0]}"
