@@ -20,6 +20,7 @@
                 "m3.large",
                 "m3.xlarge",
                 "m3.2xlarge",
+                "m4.large",
                 "m4.xlarge",
                 "m4.2xlarge",
                 "m4.4xlarge",
@@ -374,6 +375,9 @@
                 "Arch": "64"
             },
             "m3.large": {
+                "Arch": "64"
+            },
+            "m4.large": {
                 "Arch": "64"
             },
             "m4.4xlarge": {
