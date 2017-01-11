@@ -17,34 +17,49 @@ When these events happen, the lambda function is invoked. The lambda function do
 
 * VPC with VPC endpoint to S3
 * VPC must have NAT gateway and at least 1 private subnet. Ideally the NetScaler VPX will have its own private management subnet for [NSIP address] (https://docs.citrix.com/en-us/netscaler/11/networking/ip-addressing/configuring-netscaler-owned-ip-addresses/configuring-netscaler-ip-address.html)
+* An Autoscaling group in the VPC (that the VPX will loadbalance to)
 * [Terraform](https://terraform.io) on your local machine to automate the deployment of the lambda function.
 
 <img src="docs/NS - single VPX AWS deployment.png" width="720"/>
 
+You can deploy the VPX
+
 # Usage
-## Environment variables
-Update the `S3_TFCONFIG_BUCKET` environment variables in the `.env` file. Then source it
+
+## Creating the lambda function from scratch
+You can deploy a sandbox VPC, VPX and autoscaling group to see the lambda function work. 
+Use the Terraform config in [./setup](./setup). Or, use the Makefile
 
 ```
-source .env
+make  create-lambda-full
+
+OR
+cd setup; terraform get; terraform apply
 ```
 
-
-## Creating the lambda function
-To deploy the lambda function, use the Terraform config in [./lambda-resources](./lambda-resources). Or, use the Makefile:
+The full terraform config expects a few  inputs such as AWS region, the name of a keypair in that region and a base name that can be prefixed to all the resources.  This can be suppliedon the command line, or interactively:
 
 ```
-make  create-lambda
-```
+cd setup; terraform apply 
 
-The terraform config expects a number of inputs such as the VPC configuration, the tag on the NetScaler VPX instance, etc. This can be suppliedon the command line, or in the [terraform.tfvars](./lambda-resources/terraform.tfvars) file. The set of inputs is documented in [variables.tf](./lambda-resources/variables.tf).
+OR
+cd setup; terraform apply -var 'key_name=mykeypair_us_west_2' -var 'aws_region=us-west-2' -var 'base_name=qa-staging'
+
+```
+The VPC that is created is similar to the figure above: the difference is that only two subnets are created. (The management subnet and the server subnet are merged)
+
+In addition to events from the autoscaling group and the config bucket, a scheduled event will invoke the lambda function every 15 minutes.
+
+
+## Creating the lambda to attach to an existing VPC, VPX and ASG
+The lambda terraform config expects a number of inputs such as the VPC configuration, the tag on the NetScaler VPX instance, etc. This can be suppliedon the command line, or in the [terraform.tfvars](./setup/lambda/terraform.tfvars) file. The set of inputs is documented in [variables.tf](./setup/lambda/variables.tf).
 An example of using the command line:
 
 ```
-terraform apply -var 'autoscaling_group_backend_name=webservers-us-west-2a' -var 'netscaler_vpc_id=vpc-094ebf6e' -var 'netscaler_vpc_nsip_subnet_ids=["subnet-28e20d61"]' -var 'netscaler_vpc_client_subnet_ids=["subnet-953f09e3"]' -var 'netscaler_security_group_id=sg-c36b19ba'
+cd setup/lambda
+terraform apply -var 'autoscaling_group_backend_name=webservers-us-west-2a' -var 'netscaler_vpc_id=vpc-094ebf6e' -var 'netscaler_vpc_nsip_subnet_ids=["subnet-24e20d61"]' -var 'netscaler_vpc_client_subnet_ids=["subnet-853f09e3"]' -var 'netscaler_security_group_id=sg-c36b19ba'
 ```
 
-Make sure the `s3_config_bucket_name` variable matches the `S3_TFCONFIG_BUCKET` enviroment variable.
 
 ## Configuration of the NetScaler VPX
 The Terraform config that configures the NetScaler should be in the [./config](./config) subdirectory. An example is provided. To make changes and upload the config, use
@@ -53,7 +68,27 @@ The Terraform config that configures the NetScaler should be in the [./config](.
 make update-config
 ```
 
+Make sure the config bucket matches the `S3_TFCONFIG_BUCKET` enviroment variable.
+
+```
+export S3_TFCONFIG_BUCKET=$(terraform output -module lambda config_bucket)
+
+```
+
 This should upload a `config.zip` file to the S3 config bucket, which should then trigger the lambda function. Of note is the variable `vip_config` - if the terraform config has this map variable, then the key `vip` in the map will be set to the IP of the client ENI of the NetScaler.
+
+# See it work
+If everything works, then the IP of the public interface of the VPX can be retrieved:
+
+```
+vip=$(terraform output -module vpx vpx_public_ip)
+```
+
+You can see the VPX at work:
+
+```
+wget http://$vip/
+```
 
 # Workflow
 Once the lambda function is created and the initial terraform config has been uploaded, the DevOps team can make changes to the config using `make update-config`. An alternative is to have a separate git repository for the config and use Git webhooks to update `config.zip` in the S3 bucket. Github webhooks can be [automated using](https://aws.amazon.com/blogs/compute/dynamic-github-actions-with-aws-lambda/) AWS lambda as well.
@@ -62,7 +97,7 @@ Once the lambda function is created and the initial terraform config has been up
 Use CloudWatch logs to troubleshoot. The output of `terraform apply` is buried between the mutex acquire and release logs.
 
 # Development notes
-Use `make update-lambda` to update the lambda function when you change the code in `handler.py`. Use `make invoke-lambda` to test the function independent of any events. 
+Use `make update-lambda` to update the lambda function when you change the code in `handler.py`. Use `make invoke-lambda` to test the function independent of any events. (Note: Depending on the region that the terraform config was applied, you might have to change the default region for your AWS CLI to use this effectively).
 Testing locally using `make test-local` is a little bit involved. You have to set up the environment variables expected by the lambda function, and then fake the actual execution of the terraform apply (replace bin/terraform with a simple shell script)
 
 
@@ -75,7 +110,7 @@ The monetary cost should be zero or close to it.
 * IAM permissions
 
 # Cleanup
-Use `terraform destroy` to destroy the resources created by `make create-lambda`.
+Use `terraform destroy` to destroy the resources created by `make create-lambda`. 
 
 # TODO
 
