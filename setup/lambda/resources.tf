@@ -4,11 +4,14 @@ resource "random_id" "bucket_name" {
 /* since bucket names are global across accounts, generate a unique one */
 
 resource "aws_s3_bucket" "config_bucket" {
-    bucket = "${var.name}-${var.s3_config_bucket_name}-${random_id.bucket_name.b64}"
+    bucket = "${lower("${var.name}-${var.s3_config_bucket_name}-${random_id.bucket_name.b64}")}"
     acl = "private"
     force_destroy = "true"
     versioning {
        enabled = true
+    }
+    lifecycle {
+      ignore_changes = ["bucket"]
     }
     tags {
         Description = "Holds terraform config that drives NetScaler configuration"
@@ -16,10 +19,13 @@ resource "aws_s3_bucket" "config_bucket" {
 }
 
 resource "aws_s3_bucket" "state_bucket" {
-    bucket = "${var.name}-${var.s3_state_bucket_name}-${random_id.bucket_name.b64}"
+    bucket = "${lower("${var.name}-${var.s3_state_bucket_name}-${random_id.bucket_name.b64}")}"
     acl = "private"
     versioning {
        enabled = true
+    }
+    lifecycle {
+      ignore_changes = ["bucket"]
     }
     force_destroy = "true"
     tags {
@@ -183,6 +189,7 @@ resource "aws_lambda_function" "netscaler_autoscale_lambda" {
             NS_VPX_TAG_VALUE="${var.ns_vpx_tag_value}"
             NS_VPX_NSIP_ENI_DESCR="${var.ns_vpx_nsip_eni_description}"
             NS_VPX_CLIENT_ENI_DESCR="${var.ns_vpx_client_eni_description}"
+            NS_VPX_SERVER_ENI_DESCR="${var.ns_vpx_server_eni_description}"
             NS_VPX_NSIP_SUBNET_IDS="${join(",", var.netscaler_vpc_nsip_subnet_ids)}"
             NS_VPX_CLIENT_SUBNET_IDS="${join(",", var.netscaler_vpc_client_subnet_ids)}"
             S3_TFSTATE_BUCKET = "${aws_s3_bucket.state_bucket.id}"

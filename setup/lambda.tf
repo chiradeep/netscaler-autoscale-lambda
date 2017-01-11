@@ -14,4 +14,5 @@ module "lambda" {
   ns_vpx_tag_value  = "NetScalerVPX"
   ns_vpx_nsip_eni_description = "ENI connected to NSIP subnet"
   ns_vpx_client_eni_description = "ENI connected to client subnet"
+  ns_vpx_server_eni_description = "ENI connected to server subnet"
 }

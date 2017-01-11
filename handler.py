@@ -6,6 +6,7 @@ import boto3
 import botocore
 import zipfile
 import uuid
+import urllib2
 import base64
 from dyndbmutex import DynamoDbMutex
 
@@ -61,7 +62,7 @@ def fetch_asg_instance_ips(asg):
 
 
 def find_ns_vpx_instances(tagkey, tagvalue, nsip_subnet_ids, client_subnet_ids,
-                          eni_nsip_descr, eni_client_descr):
+                          eni_nsip_descr, eni_client_descr, eni_server_descr):
     filters = [{'Name': 'tag:{}'.format(tagkey), 'Values': [tagvalue]}]
     result = []
     reservations = ec2_client.describe_instances(Filters=filters)
@@ -98,6 +99,13 @@ def find_ns_vpx_instances(tagkey, tagvalue, nsip_subnet_ids, client_subnet_ids,
                         logger.info("NS instance: " + instance_id +
                                     ", nsip ip=" + eni['PrivateIpAddress'])
                         result.append(instance_info)
+                    if eni['Description'] == eni_server_descr:
+                        logger.info("ENI description matches server ENI id=" +
+                                    eni['NetworkInterfaceId'] +
+                                    ", ip=" + eni['PrivateIpAddress'])
+                        instance_info['ns_snip'] = eni['PrivateIpAddress']
+                        logger.info("NS instance: " + instance_id +
+                                    ", server eni ip=" + eni['PrivateIpAddress'])
 
     logger.info("find_ns_vpx_instances:found " + str(len(result)) +
                 " instances")
@@ -156,6 +164,29 @@ def upload_tfstate(state_bucket, instance_id):
                 " to bucket " + state_bucket)
 
 
+def configure_snip(vpx_info):
+    # the SNIP is unconfigured on a freshly installed VPX. We don't
+    # know if the SNIP is already configured, but try anyway. Ignore
+    # 409 conflict errors
+    url = vpx_info['ns_url'] + 'nitro/v1/config/nsip'
+    snip = vpx_info['ns_snip']
+    password = vpx_info['instance_id']
+    subnet = '255.255.255.0'  # TODO. We should get this from the subnet info
+
+    jsons = '{{"nsip":{{"ipaddress":"{}", "netmask":"{}", "type":"snip"}}}}'.format(snip, subnet)
+    headers = {'Content-Type': 'application/json', 'X-NITRO-USER': 'nsroot', 'X-NITRO-PASS': password}
+    r = urllib2.Request(url, data=jsons, headers=headers)
+    try:
+        urllib2.urlopen(r)
+        logger.info("Configured SNIP: snip= " + snip)
+    except urllib2.HTTPError as hte:
+        if hte.code != 409:
+            logger.info("Error configuring SNIP: Error code: " +
+                        str(hte.code) + ", reason=" + hte.reason)
+        else:
+            logger.info("SNIP already configured")
+
+
 def configure_vpx(vpx_info, services):
     try:
         NS_URL = vpx_info['ns_url']
@@ -178,8 +209,12 @@ def configure_vpx(vpx_info, services):
         vip_config = "-var '" + 'vip_config={{vip="{}"}}'.format(vip) + "'"
 
     logger.info(vpx_info)
+    configure_snip(vpx_info)
+
     fetch_tfstate(state_bucket, instance_id)
+
     fetch_tfconfig(config_bucket)
+
     command = "{} NS_URL={} NS_LOGIN={} NS_PASSWORD={} {}/terraform apply -state={} -backup=- -no-color -var-file={}/terraform.tfvars -var 'backend_services=[{}]' {} {}".format(tf_log, NS_URL, NS_LOGIN, NS_PASSWORD, bindir, get_tfstate_path(instance_id), tfconfig_local_dir, services, vip_config, tfconfig_local_dir)
     logger.info("****Executing on NetScaler: " + instance_id +
                 " command: " + command)
@@ -214,6 +249,7 @@ def handler(event, context):
         vpx_tag_value = os.environ['NS_VPX_TAG_VALUE']
         nsip_eni_description = os.environ['NS_VPX_NSIP_ENI_DESCR']
         client_eni_description = os.environ['NS_VPX_CLIENT_ENI_DESCR']
+        server_eni_description = os.environ['NS_VPX_SERVER_ENI_DESCR']
         asg = os.environ['ASG_NAME']
     except KeyError as ke:
         logger.warn("Bailing since we can't get the required env var: " +
@@ -222,7 +258,9 @@ def handler(event, context):
 
     vpx_instances = find_ns_vpx_instances(vpx_tag_key, vpx_tag_value,
                                           nsip_subnet_ids, client_subnet_ids,
-                                          nsip_eni_description, client_eni_description)
+                                          nsip_eni_description,
+                                          client_eni_description,
+                                          server_eni_description)
     if len(vpx_instances) == 0:
         logger.warn("No NetScaler instances to configure!, Exiting")
         return

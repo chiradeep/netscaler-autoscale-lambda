@@ -13,3 +13,15 @@ resource "aws_cloudformation_stack" "nsvpx" {
   }
 
 }
+
+output "vpx_id" {
+  value = "${aws_cloudformation_stack.nsvpx.outputs["InstanceIdNS"]}"
+}
+
+output "vpx_public_ip" {
+  value = "${aws_cloudformation_stack.nsvpx.outputs["PublicIP"]}"
+}
+
+output "vpx_client_ip" {
+  value = "${aws_cloudformation_stack.nsvpx.outputs["ClientIP"]}"
+}
