@@ -4,7 +4,7 @@ resource "random_id" "bucket_name" {
 /* since bucket names are global across accounts, generate a unique one */
 
 resource "aws_s3_bucket" "config_bucket" {
-    bucket = "${lower("${var.name}-${var.s3_config_bucket_name}-${random_id.bucket_name.b64}")}"
+    bucket = "${lower("${var.name}-${var.s3_config_bucket_name}-${random_id.bucket_name.hex}")}"
     acl = "private"
     force_destroy = "true"
     versioning {
@@ -19,7 +19,7 @@ resource "aws_s3_bucket" "config_bucket" {
 }
 
 resource "aws_s3_bucket" "state_bucket" {
-    bucket = "${lower("${var.name}-${var.s3_state_bucket_name}-${random_id.bucket_name.b64}")}"
+    bucket = "${lower("${var.name}-${var.s3_state_bucket_name}-${random_id.bucket_name.hex}")}"
     acl = "private"
     versioning {
        enabled = true
