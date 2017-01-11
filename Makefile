@@ -6,9 +6,10 @@ help:
 	@echo "  package-config      to package the NetScaler Terraform config"
 	@echo "  update-config       to upload the NetScaler Terraform config to S3"
 	@echo "  create-lambda       to create the lambda function in AWS"
-	@echo "  update-lambda       to update the lambda function in AWS"
+	@echo "  create-lambda-full  to create the lambda function AND all required resources such as VPC and ASG in AWS"
+	@echo "  update-lambda       to update the lambda function in AWS. May be mismatched to the region deployed"
 	@echo "  test-local          to test locally"
-	@echo "  invoke-lambda       to invoke execution in AWS"
+	@echo "  invoke-lambda       to invoke execution in AWS. May be mismatched to the region"
 
 dyndbdmutex.py:
 	curl -s -R -S -L -f https://github.com/chiradeep/lambda-mutex/releases/download/v0.20/dyndbmutex-0.2.0.tar.gz  -z dyndbmutex.py -o dyndbmutex-0.2.0.tar.gz
@@ -46,11 +47,11 @@ update-lambda:  package-lambda
 
 create-lambda: package-lambda
 	@echo "Create lambda and associated resources in AWS using Terraform"
-	(cd lambda-resources; terraform apply)
+	(cd setup/lambda; terraform apply)
 
-create-lambda-role:
-	@echo "create lambda execution role"
-	setup/create_lambda_role.sh
+create-lambda-full: package-lambda package-config
+	@echo "Create VPC, Autoscaling Group, VPX, lambda and associated resources in AWS using Terraform"
+	(cd setup; terraform get; terraform apply)
 
 test-local:
 	@echo "Testing locally"
