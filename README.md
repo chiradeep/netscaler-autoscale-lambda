@@ -86,6 +86,7 @@ Once the lambda function is created and the initial terraform config has been up
 
 # Troubleshooting
 Use CloudWatch logs to troubleshoot. The output of `terraform apply` is buried between the mutex acquire and release logs.
+If you need detailed terraform logs, set `tf_log` in handler.py and update the lambda function.
 
 # Development notes
 You will need to set the environment variable :
@@ -104,11 +105,37 @@ cd setup
 terraform apply -var 'key_name=mykeypair_us_west_2' -var 'aws_region=us-west-2' -var 'base_name=qa-staging'
 ```
 
-Testing locally using `make test-local` is a little bit involved. You have to set up the environment variables expected by the lambda function, and then fake the actual execution of the terraform apply (replace bin/terraform with a simple shell script)
+## Testing locally
+Install the `python-lambda-local` python package:
 
+```
+sudo pip install python-lambda-local
+```
+
+Find the required environment variables and export them:
+
+```
+make get-env-vars # assumes you have run the terraform in setup/ successfully
+```
+
+Export them:
+
+```
+export NSLOGIN=nsroot
+...
+...
+```
+
+Test:
+
+```
+make test-local
+```
+
+Note that the execution of the terraform binary will fail during local testing.
 
 # Resources used
-The monetary cost should be zero or close to it.
+The monetary cost should be zero or close to it (other than the actual cost of running the VPX).
 
 * A DynamoDB table to hold the mutex (low throughput: 2 writes/sec)
 * Lambda execution. The number of executions is controlled by the number of scaling events and the number of config changes. Generally this should be in the free tier.
@@ -118,7 +145,7 @@ The monetary cost should be zero or close to it.
 # Cleanup
 Use `terraform destroy` to destroy the resources created by `make create-lambda`. 
 
-````
+```
 cd setup
 terraform destroy -var 'key_name=mykeypair_us_west_2' -var 'aws_region=us-west-2' -var 'base_name=qa-staging'
 ```
