@@ -21,8 +21,8 @@ tfconfig_path = "/tmp/config.zip"
 tfconfig_local_dir = "/tmp/tfconfig/config/"
 tfconfig_key = "config.zip"
 
-# tf_log = "TF_LOG=DEBUG"
 tf_log = ""
+# tf_log = "TF_LOG=DEBUG"
 
 s3_client = boto3.client('s3')
 asg_client = boto3.client('autoscaling')

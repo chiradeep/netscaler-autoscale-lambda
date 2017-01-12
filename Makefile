@@ -53,6 +53,21 @@ create-lambda-full: package-lambda package-config
 	@echo "Create VPC, Autoscaling Group, VPX, lambda and associated resources in AWS using Terraform"
 	(cd setup; terraform get; terraform apply)
 
+get-env-vars:
+	@echo "export NS_LOGIN=nsroot"
+	@echo "export NS_PASSWORD=$$(terraform output -state=setup/terraform.tfstate -module vpx vpx_id)"
+	@echo "export NS_VPX_TAG_KEY=Name"
+	@echo "export NS_VPX_TAG_VALUE=NetScalerVPX"
+	@echo "export NS_VPX_NSIP_ENI_DESCR=\"ENI connected to NSIP subnet\""
+	@echo "export NS_VPX_CLIENT_ENI_DESCR=\"ENI connected to Client subnet\""
+	@echo "export NS_VPX_SERVER_ENI_DESCR=\"ENI connected to Server subnet\""
+	@echo "export NS_VPX_NSIP_SUBNET_IDS=$$(terraform output -state=setup/terraform.tfstate -module vpc private_subnets)"
+	@echo "export NS_VPX_CLIENT_SUBNET_IDS=$$(terraform output -state=setup/terraform.tfstate -module vpc public_subnets)"
+	@echo "export S3_TFSTATE_BUCKET=$$(terraform output -state=setup/terraform.tfstate -module lambda state_bucket)"
+	@echo "export S3_TFCONFIG_BUCKET=$$(terraform output -state=setup/terraform.tfstate -module lambda config_bucket)"
+	@echo "export DD_MUTEX_TABLE_NAME=$$(terraform output -state=setup/terraform.tfstate -module lambda mutex_table)"
+	@echo "export ASG_NAME=$$(terraform output -state=setup/terraform.tfstate -module asg asg_name)"
+
 test-local:
 	@echo "Testing locally"
 	python-lambda-local -l lib/ -f handler -t 50 handler.py event.json

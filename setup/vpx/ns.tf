@@ -25,3 +25,7 @@ output "vpx_public_ip" {
 output "vpx_client_ip" {
   value = "${aws_cloudformation_stack.nsvpx.outputs["ClientIP"]}"
 }
+
+output "vpx_nsip" {
+  value = "${aws_cloudformation_stack.nsvpx.outputs["NSIP"]}"
+}

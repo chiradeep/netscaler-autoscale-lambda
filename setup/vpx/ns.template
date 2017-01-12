@@ -66,6 +66,12 @@
             "Value": {
                  "Fn::GetAtt" : [ "ClientENI", "PrimaryPrivateIpAddress" ]
             }
+        },
+        "NSIP": {
+            "Description": "IP of the NSIP ENI",
+            "Value": {
+                 "Fn::GetAtt" : [ "NsipENI", "PrimaryPrivateIpAddress" ]
+            }
         }
     },
 
