@@ -56,3 +56,7 @@ resource "aws_instance" "jumpbox" {
     }
     key_name = "${var.key_name}"
 }
+
+output "jumpbox_publicip" {
+    value = "${aws_instance.jumpbox.public_ip}"
+}
