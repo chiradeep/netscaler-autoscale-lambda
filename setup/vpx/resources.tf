@@ -134,7 +134,7 @@ resource "aws_instance" "netscalervpx" {
     iam_instance_profile = "${aws_iam_instance_profile.CitrixNodesProfile.id}"
 }
 
-resource "aws_eip" "lb" {
+resource "aws_eip" "client_public_ip" {
   network_interface = "${aws_network_interface.ClientENI.id}"
   vpc      = true
 }
