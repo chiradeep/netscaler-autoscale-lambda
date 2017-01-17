@@ -12,7 +12,7 @@ module "lambda" {
   /* the following are taken from the CloudFormation template in vpx/ns.template */
   ns_vpx_tag_key  = "Name"
   ns_vpx_tag_value  = "NetScalerVPX"
-  ns_vpx_nsip_eni_description = "ENI connected to NSIP subnet"
+  ns_vpx_nsip_eni_description = ""
   ns_vpx_client_eni_description = "ENI connected to client subnet"
   ns_vpx_server_eni_description = "ENI connected to server subnet"
 }

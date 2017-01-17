@@ -49,18 +49,6 @@ resource "aws_network_interface" "ServerENI" {
     }
 }
 
-resource "aws_network_interface" "NsipENI" {
-    subnet_id = "${var.nsip_subnet}"
-    security_groups =  ["${var.security_group_id}"]
-    description =  "ENI connected to NSIP subnet"
-    tags {
-           Purpose = "NsipENI"
-    }
-    attachment {
-        instance = "${aws_instance.netscalervpx.id}"
-        device_index = 0
-    }
-}
 
 resource "aws_network_interface" "ClientENI" {
     subnet_id = "${var.client_subnet}"
@@ -128,13 +116,13 @@ resource "aws_instance" "netscalervpx" {
     instance_type = "${lookup(var.allowed_sizes, var.vpx_size)}"
     vpc_security_group_ids = ["${var.security_group_id}"]
     tags { 
-       Name = "NetscalerVPX"
+       Name = "NetScalerVPX"
     }
     key_name = "${var.key_name}"
     iam_instance_profile = "${aws_iam_instance_profile.CitrixNodesProfile.id}"
 }
 
-resource "aws_eip" "client_public_ip" {
-  network_interface = "${aws_network_interface.ClientENI.id}"
-  vpc      = true
+resource "aws_eip_association" "client_public_ip" {
+  allocation_id = "${var.eip_publicip}"
+  network_interface_id = "${aws_network_interface.ClientENI.id}"
 }

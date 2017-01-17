@@ -6,6 +6,7 @@ variable "nsip_subnet" {}
 variable "vpc_id" {}
 variable "security_group_id" {}
 variable "key_name" {}
+variable "eip_publicip" {}
 variable "allowed_sizes" {
    type = "map"
    description = "list of allowed vpx sizes"

@@ -8,5 +8,6 @@ module "vpx" {
   server_subnet = "${module.vpc.private_subnets[0]}"
   nsip_subnet = "${module.vpc.private_subnets[0]}"
   vpc_id = "${module.vpc.vpc_id}"
+  eip_publicip = "${aws_eip.public_lb_ip.id}"
   key_name = "${var.key_name}"
 }
