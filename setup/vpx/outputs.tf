@@ -1,15 +1,7 @@
-output "vpx_id" {
-  value = "${aws_instance.netscalervpx.id}"
+output "launch_configuration" {
+  value = "${aws_launch_configuration.vpx-lc.id}"
 }
 
-output "vpx_public_ip" {
-  value = "${aws_eip_association.client_public_ip.public_ip}"
-}
-
-output "vpx_client_ip" {
-  value = "${aws_eip_association.client_public_ip.private_ip}"
-}
-
-output "vpx_nsip" {
-  value = "${aws_instance.netscalervpx.private_ip}"
+output "asg_name" {
+  value = "${aws_autoscaling_group.vpx-asg.id}"
 }

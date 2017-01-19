@@ -6,6 +6,7 @@
   "account": "123456789012",
   "Time": "2017-01-17T18:37:17.553Z",
   "region": "us-west-2",
+  "instance-id": "i-0ae5ecfa4fee3eb68",
   "resources": [
     "auto-scaling-group-arn"
   ],
@@ -13,7 +14,7 @@
     "LifecycleActionToken":"87654321-4321-4321-4321-210987654321", 
     "AutoScalingGroupName":"my-asg", 
     "LifecycleHookName":"my-lifecycle-hook", 
-    "EC2InstanceId":"i-12345678", 
+    "EC2InstanceId":"i-06d449e464e6205dc",
     "LifecycleTransition":"autoscaling:EC2_INSTANCE_LAUNCHING" 
   } 
 }
