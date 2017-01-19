@@ -2,6 +2,7 @@ import boto3
 import botocore
 import logging
 import os
+import sys
 import socket
 import struct
 import urllib2
@@ -25,7 +26,7 @@ def get_subnet(az, vpc_id, tag_key, tag_value):
     for subnet in subnets['Subnets']:
         for tag in subnet['Tags']:
             if tag['Key'] == tag_key and tag_value in tag['Value']:
-                return subnet['SubnetId']
+                return subnet
     return None
 
 
@@ -34,18 +35,27 @@ def get_instance(instance_id):
     for reservation in ec2_reservations['Reservations']:
         ec2_instances = reservation['Instances']
         for ec2_instance in ec2_instances:
-            return ec2_instance
+            if ec2_instance['State']['Name'] == 'running':
+                return ec2_instance
     return None
 
 
-def attach_eip(public_ips, interface_id):
-    filters = [{'Name': 'domain', 'Values': ['vpc']},
-               {'Name': 'association-id', 'Values': []}]
+def attach_eip(public_ips_str, interface_id):
+    filters = [{'Name': 'domain', 'Values': ['vpc']}]
+    public_ips = public_ips_str.split(",")
     addresses = ec2_client.describe_addresses(PublicIps=public_ips,
                                               Filters=filters)['Addresses']
-    if len(addresses) == 0:
+    free_addr = None
+    for addr in addresses:
+        assoc = addr.get('AssociationId')
+        if assoc is None or assoc == '':
+            free_addr = addr.get('PublicIp')
+            break
+
+    if free_addr is None:
         raise Exception("Could not find a free elastic ip")
-    response = ec2_client.associate_address(PublicIp=addresses[0],
+
+    response = ec2_client.associate_address(PublicIp=free_addr,
                                             NetworkInterfaceId=interface_id)
     return response['AssociationId']
 
@@ -81,6 +91,8 @@ def lambda_handler(event, context):
     instance_id = event["detail"]["EC2InstanceId"]
     try:
         PUBLIC_IPS = os.environ['PUBLIC_IPS']
+        CLIENT_SG = os.environ['CLIENT_SG']
+        SERVER_SG = os.environ['SERVER_SG']
     except KeyError as ke:
         logger.warn("Bailing since we can't get the required variable: " +
                     ke.args[0])
@@ -91,28 +103,34 @@ def lambda_handler(event, context):
         az = instance['Placement']['AvailabilityZone']
         vpc_id = instance['VpcId']
 
-
         ns_url = 'http://{}:80/'.format(instance['PrivateIpAddress'])  # TODO:https
-        public_subnet = get_subnet(az, vpc_id, 'Name', 'public-subnet')
-        private_subnet = get_subnet(az, vpc_id, 'Name', 'private-subnet')
-        client_interface_id = None
-        server_interface_id = None
+        logger.info("ns_url=" + ns_url)
+        public_subnet = get_subnet(az, vpc_id, 'Name', 'subnet-public')
+        private_subnet = get_subnet(az, vpc_id, 'Name', 'subnet-private')
+        client_interface = None
+        server_interface = None
+        eip_assoc = None
         try:
-            client_interface = create_interface(public_subnet['SubnetId'])
+            logger.info("Going to create client interface, subnet=" + str(public_subnet))
+            client_interface = create_interface(public_subnet['SubnetId'], CLIENT_SG)
+            logger.info("Going to attach client interface")
             attach_interface(client_interface['NetworkInterfaceId'], instance_id, 1)
-            server_interface = create_interface(private_subnet['SubnetId'])
+            server_interface = create_interface(private_subnet['SubnetId'], SERVER_SG)
             attach_interface(server_interface['NetworkInterfaceId'], instance_id, 2)
-            attach_eip(PUBLIC_IPS, client_interface['NetworkInterfaceId'])
+            eip_assoc = attach_eip(PUBLIC_IPS, client_interface['NetworkInterfaceId'])
             configure_snip(instance_id, ns_url, server_interface, private_subnet)
         except:
-            if client_interface_id:
-                log("Removing client network interface {} after attachment failed.".format(
-                    client_interface_id))
-                delete_interface(client_interface_id)
-            if server_interface_id:
-                log("Removing server network interface {} after attachment failed.".format(
-                    server_interface_id))
-                delete_interface(server_interface_id)
+            logger.warn("Caught exception: " + str(sys.exc_info()[:2]))
+            if client_interface:
+                logger.warn("Removing client network interface {} after attachment failed.".format(
+                    client_interface['NetworkInterfaceId']))
+                delete_interface(client_interface)
+            if server_interface:
+                logger.warn("Removing server network interface {} after attachment failed.".format(
+                    server_interface['NetworkInterfaceId']))
+                delete_interface(server_interface)
+            if eip_assoc:
+                logger.warn("Removing eip assoc {} after orchestration failed.".format(eip_assoc))
 
         try:
             asg_client.complete_lifecycle_action(
@@ -122,24 +140,25 @@ def lambda_handler(event, context):
                 LifecycleActionResult='CONTINUE'
             )
         except botocore.exceptions.ClientError as e:
-            log("Error completing life cycle hook for instance {}: {}".format(
+            logger.warn("Error completing life cycle hook for instance {}: {}".format(
                 instance_id, e.response['Error']['Code']))
-            log('{"Error": "1"}')
+            logger.warn('{"Error": "1"}')
 
 
-def create_interface(subnet_id):
+def create_interface(subnet_id, security_groups):
     network_interface_id = None
     if subnet_id:
         try:
             network_interface = ec2_client.create_network_interface(
-                SubnetId=subnet_id)
+                SubnetId=subnet_id,
+                Groups=[security_groups])
             network_interface_id = network_interface[
                 'NetworkInterface']['NetworkInterfaceId']
-            log("Created network interface: {}".format(network_interface_id))
+            logger.info("Created network interface: {}".format(network_interface_id))
             return network_interface['NetworkInterface']
 
         except botocore.exceptions.ClientError as e:
-            log("Error creating network interface: {}".format(
+            logger.warn("Error creating network interface: {}".format(
                 e.response['Error']['Code']))
             raise
 
@@ -156,21 +175,20 @@ def attach_interface(network_interface_id, instance_id, index):
                 DeviceIndex=index
             )
             attachment = attach_interface['AttachmentId']
-            log("Created network attachment: {}".format(attachment))
+            logger.info("Created network attachment: {}".format(attachment))
 
         except botocore.exceptions.ClientError as e:
-            log("Error attaching network interface: {}".format(
+            logger.warn("Error attaching network interface: {}".format(
                 e.response['Error']['Code']))
             raise
 
     return attachment
 
 
-def delete_interface(network_interface_id):
+def delete_interface(network_interface):
+    network_interface_id = network_interface['NetworkInterfaceId']
     try:
-        ec2_client.delete_network_interface(
-            NetworkInterfaceId=network_interface_id
-        )
+        ec2_client.delete_network_interface(NetworkInterfaceId=network_interface_id)
 
     except botocore.exceptions.ClientError as e:
         log("Error deleting interface {}: {}".format(
