@@ -6,7 +6,6 @@ import sys
 import socket
 import struct
 import urllib2
-from datetime import datetime
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -49,13 +48,13 @@ def attach_eip(public_ips_str, interface_id):
     for addr in addresses:
         assoc = addr.get('AssociationId')
         if assoc is None or assoc == '':
-            free_addr = addr.get('PublicIp')
+            free_addr = addr
             break
 
     if free_addr is None:
         raise Exception("Could not find a free elastic ip")
 
-    response = ec2_client.associate_address(PublicIp=free_addr,
+    response = ec2_client.associate_address(AllocationId=addr.get('AllocationId'),
                                             NetworkInterfaceId=interface_id)
     return response['AssociationId']
 
@@ -68,10 +67,11 @@ def configure_snip(instance_id, ns_url, server_eni, server_subnet):
     if NS_PASSWORD == 'SAME_AS_INSTANCE_ID':
         NS_PASSWORD = instance_id
     url = ns_url + 'nitro/v1/config/nsip'
-    snip = server_eni['PrimaryIpAddress']
-    subnet_len = server_subnet['CidrBlock'].split("/")[1]
+    snip = server_eni['PrivateIpAddress']
+    subnet_len = int(server_subnet['CidrBlock'].split("/")[1])
     mask = (1 << 32) - (1 << 32 >> subnet_len)
     subnet_mask = socket.inet_ntoa(struct.pack(">L", mask))
+    logger.info("Configuring SNIP: snip= " + snip + ", mask=" + subnet_mask)
 
     jsons = '{{"nsip":{{"ipaddress":"{}", "netmask":"{}", "type":"snip"}}}}'.format(snip, subnet_mask)
     headers = {'Content-Type': 'application/json', 'X-NITRO-USER': 'nsroot', 'X-NITRO-PASS': NS_PASSWORD}
@@ -121,6 +121,9 @@ def lambda_handler(event, context):
             configure_snip(instance_id, ns_url, server_interface, private_subnet)
         except:
             logger.warn("Caught exception: " + str(sys.exc_info()[:2]))
+            if eip_assoc:
+                logger.warn("Removing eip assoc {} after orchestration failed.".format(eip_assoc))
+                ec2_client.disassociate_address(AssociationId=eip_assoc)
             if client_interface:
                 logger.warn("Removing client network interface {} after attachment failed.".format(
                     client_interface['NetworkInterfaceId']))
@@ -129,8 +132,6 @@ def lambda_handler(event, context):
                 logger.warn("Removing server network interface {} after attachment failed.".format(
                     server_interface['NetworkInterfaceId']))
                 delete_interface(server_interface)
-            if eip_assoc:
-                logger.warn("Removing eip assoc {} after orchestration failed.".format(eip_assoc))
 
         try:
             asg_client.complete_lifecycle_action(
@@ -187,13 +188,14 @@ def attach_interface(network_interface_id, instance_id, index):
 
 def delete_interface(network_interface):
     network_interface_id = network_interface['NetworkInterfaceId']
+    # refresh to see if attached
     try:
+        interfaces = ec2_client.describe_network_interfaces(NetworkInterfaceIds=[network_interface_id])
+        network_interface = interfaces['NetworkInterfaces'][0]
+        if network_interface['Status'] == 'in-use':
+            ec2_client.detach_network_interface(AttachmentId=network_interface['Attachment']['AttachmentId'])
         ec2_client.delete_network_interface(NetworkInterfaceId=network_interface_id)
 
     except botocore.exceptions.ClientError as e:
-        log("Error deleting interface {}: {}".format(
+        logger.warn("Error deleting interface {}: {}".format(
             network_interface_id, e.response['Error']['Code']))
-
-
-def log(message):
-    print (datetime.utcnow().isoformat() + 'Z ' + message)
