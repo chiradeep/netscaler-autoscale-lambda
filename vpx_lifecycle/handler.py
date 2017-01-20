@@ -6,7 +6,7 @@ import sys
 import socket
 import struct
 import urllib2
-import json
+import time
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -194,9 +194,18 @@ def delete_interface(network_interface):
     try:
         interfaces = ec2_client.describe_network_interfaces(NetworkInterfaceIds=[network_interface_id])
         network_interface = interfaces['NetworkInterfaces'][0]
-        if network_interface['Status'] == 'in-use':
+        if network_interface['Status'] != 'available':
             ec2_client.detach_network_interface(AttachmentId=network_interface['Attachment']['AttachmentId'])
-        ec2_client.delete_network_interface(NetworkInterfaceId=network_interface_id)
+        poll_count = 5
+        while network_interface['Status'] != 'available' and poll_count > 0:
+            poll_count = poll_count - 1
+            interfaces = ec2_client.describe_network_interfaces(NetworkInterfaceIds=[network_interface_id])
+            network_interface = interfaces['NetworkInterfaces'][0]
+            time.sleep(5)
+        if network_interface['Status'] == 'available':
+            ec2_client.delete_network_interface(NetworkInterfaceId=network_interface_id)
+        else:
+            logger.warn("Network Interface {} can't be deleted (waited 25 seconds)".format(network_interface_id))
 
     except botocore.exceptions.ClientError as e:
         logger.warn("Error deleting interface {}: {}".format(

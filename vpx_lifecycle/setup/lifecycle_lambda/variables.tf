@@ -18,3 +18,8 @@ variable "netscaler_vpc_nsip_subnet_ids" {
    type = "list"
    description = "List of subnet ids, e.g., subnet-1abcdef,subnet-2defaae that host the management NIC(s) of the NetScalers"
 }
+
+variable "vpx_autoscaling_group_name" {
+    type = "string"
+    description = "Name of autoscaling group that the VPX belongs to"
+}
