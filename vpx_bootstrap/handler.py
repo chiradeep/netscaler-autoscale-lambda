@@ -86,8 +86,10 @@ def configure_snip(instance_id, ns_url, server_eni, server_subnet):
 
 
 def lambda_handler(event, context):
+    logger.info(str(event))
     instance_id = event["detail"]["EC2InstanceId"]
-    metadata = json.loads(event['detail']['NotificationMetadata'])
+    # metadata = json.loads(event['detail']['NotificationMetadata'])
+    metadata = event['detail']['NotificationMetadata']
     try:
         public_ips = metadata['public_ips']
         client_sg = metadata['client_security_group']
