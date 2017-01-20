@@ -14,7 +14,8 @@
     "LifecycleActionToken":"87654321-4321-4321-4321-210987654321", 
     "AutoScalingGroupName":"my-asg", 
     "LifecycleHookName":"my-lifecycle-hook", 
-    "EC2InstanceId":"i-06d449e464e6205dc",
-    "LifecycleTransition":"autoscaling:EC2_INSTANCE_LAUNCHING" 
+    "EC2InstanceId":"i-00ea98d3e747c3f96",
+    "LifecycleTransition":"autoscaling:EC2_INSTANCE_LAUNCHING",
+    "NotificationMetadata": "{\"client_security_group\" : \"sg-eab11b92\", \"public_ips\": \"35.160.222.27,35.162.125.122\", \"server_security_group\" : \"sg-f6b11b8e\", \"private_subnets\": [\"subnet-43e53d24\"], \"public_subnets\": [\"subnet-42e53d25\"]}"
   } 
 }

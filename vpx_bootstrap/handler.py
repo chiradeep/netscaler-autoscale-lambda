@@ -6,6 +6,7 @@ import sys
 import socket
 import struct
 import urllib2
+import json
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -17,15 +18,12 @@ ec2_client = boto3.client('ec2')
 asg_client = boto3.client('autoscaling')
 
 
-def get_subnet(az, vpc_id, tag_key, tag_value):
+def get_subnet(az, vpc_id, subnet_ids):
     filters = [{'Name': 'availability-zone', 'Values': [az]},
-               {'Name': 'vpc-id', 'Values': [vpc_id]},
-               {'Name': 'tag-key', 'Values': [tag_key]}]
-    subnets = ec2_client.describe_subnets(Filters=filters)
+               {'Name': 'vpc-id', 'Values': [vpc_id]}]
+    subnets = ec2_client.describe_subnets(SubnetIds=subnet_ids, Filters=filters)
     for subnet in subnets['Subnets']:
-        for tag in subnet['Tags']:
-            if tag['Key'] == tag_key and tag_value in tag['Value']:
-                return subnet
+        return subnet
     return None
 
 
@@ -89,10 +87,13 @@ def configure_snip(instance_id, ns_url, server_eni, server_subnet):
 
 def lambda_handler(event, context):
     instance_id = event["detail"]["EC2InstanceId"]
+    metadata = json.loads(event['detail']['NotificationMetadata'])
     try:
-        PUBLIC_IPS = os.environ['PUBLIC_IPS']
-        CLIENT_SG = os.environ['CLIENT_SG']
-        SERVER_SG = os.environ['SERVER_SG']
+        public_ips = metadata['public_ips']
+        client_sg = metadata['client_security_group']
+        server_sg = metadata['server_security_group']
+        public_subnets = metadata['public_subnets']
+        private_subnets = metadata['private_subnets']
     except KeyError as ke:
         logger.warn("Bailing since we can't get the required variable: " +
                     ke.args[0])
@@ -105,19 +106,19 @@ def lambda_handler(event, context):
 
         ns_url = 'http://{}:80/'.format(instance['PrivateIpAddress'])  # TODO:https
         logger.info("ns_url=" + ns_url)
-        public_subnet = get_subnet(az, vpc_id, 'Name', 'subnet-public')
-        private_subnet = get_subnet(az, vpc_id, 'Name', 'subnet-private')
+        public_subnet = get_subnet(az, vpc_id, public_subnets)
+        private_subnet = get_subnet(az, vpc_id, private_subnets)
         client_interface = None
         server_interface = None
         eip_assoc = None
         try:
             logger.info("Going to create client interface, subnet=" + str(public_subnet))
-            client_interface = create_interface(public_subnet['SubnetId'], CLIENT_SG)
+            client_interface = create_interface(public_subnet['SubnetId'], client_sg)
             logger.info("Going to attach client interface")
             attach_interface(client_interface['NetworkInterfaceId'], instance_id, 1)
-            server_interface = create_interface(private_subnet['SubnetId'], SERVER_SG)
+            server_interface = create_interface(private_subnet['SubnetId'], server_sg)
             attach_interface(server_interface['NetworkInterfaceId'], instance_id, 2)
-            eip_assoc = attach_eip(PUBLIC_IPS, client_interface['NetworkInterfaceId'])
+            eip_assoc = attach_eip(public_ips, client_interface['NetworkInterfaceId'])
             configure_snip(instance_id, ns_url, server_interface, private_subnet)
         except:
             logger.warn("Caught exception: " + str(sys.exc_info()[:2]))
@@ -143,7 +144,6 @@ def lambda_handler(event, context):
         except botocore.exceptions.ClientError as e:
             logger.warn("Error completing life cycle hook for instance {}: {}".format(
                 instance_id, e.response['Error']['Code']))
-            logger.warn('{"Error": "1"}')
 
 
 def create_interface(subnet_id, security_groups):
