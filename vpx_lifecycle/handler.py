@@ -72,18 +72,30 @@ def configure_snip(instance_id, ns_url, server_eni, server_subnet):
     subnet_mask = socket.inet_ntoa(struct.pack(">L", mask))
     logger.info("Configuring SNIP: snip= " + snip + ", mask=" + subnet_mask)
 
+    retry_count = 0
+    retry = True
     jsons = '{{"nsip":{{"ipaddress":"{}", "netmask":"{}", "type":"snip"}}}}'.format(snip, subnet_mask)
     headers = {'Content-Type': 'application/json', 'X-NITRO-USER': 'nsroot', 'X-NITRO-PASS': NS_PASSWORD}
     r = urllib2.Request(url, data=jsons, headers=headers)
-    try:
-        urllib2.urlopen(r)
-        logger.info("Configured SNIP: snip= " + snip)
-    except urllib2.HTTPError as hte:
-        if hte.code != 409:
-            logger.info("Error configuring SNIP: Error code: " +
-                        str(hte.code) + ", reason=" + hte.reason)
-        else:
-            logger.info("SNIP already configured")
+    while retry:
+        try:
+            urllib2.urlopen(r)
+            logger.info("Configured SNIP: snip= " + snip)
+            retry = False
+        except urllib2.HTTPError as hte:
+            if hte.code != 409:
+                logger.info("Error configuring SNIP: Error code: " +
+                            str(hte.code) + ", reason=" + hte.reason)
+                if hte.code == 503:  # service unavailable, just sleep and try again
+                    retry_count += retry_count + 1
+                    if retry_count > 9:
+                        retry = False
+                        break
+                    logger.info("NS VPX is not ready to be configured, retrying in 10 seconds")
+                    time.sleep(10)
+            else:
+                logger.info("SNIP already configured")
+                retry = False
 
 
 def lambda_handler(event, context):
