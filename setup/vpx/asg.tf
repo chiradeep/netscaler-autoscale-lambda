@@ -21,7 +21,7 @@ output "ami_id" {
 
 resource "aws_autoscaling_group" "vpx-asg" {
   name                 =  "${var.name}-ns-autoscale-vpx-asg"
-  max_size             = 1
+  max_size             = 4
   min_size             = 1
   desired_capacity     = 1
   force_delete         = true
@@ -33,21 +33,21 @@ resource "aws_autoscaling_group" "vpx-asg" {
 
   tag {
     key                 = "Name"
-    value               = "ns-autoscale-vpx"
+    value               = "NetScalerVPX"
     propagate_at_launch = "true"
   }
   initial_lifecycle_hook {
     name                   = "ns-vpx-lifecycle-hook"
     default_result         = "CONTINUE"
-    heartbeat_timeout      = 30
+    heartbeat_timeout      = 180
     lifecycle_transition   = "autoscaling:EC2_INSTANCE_LAUNCHING"
     notification_metadata = <<EOF
 {
   "client_security_group" : "${var.client_security_group}",
   "server_security_group" : "${var.server_security_group}",
   "public_ips": "${var.public_ips}",
-  "private_subnets": "${var.server_subnets}",
-  "public_subnets": "${var.client_subnets}"
+  "private_subnets": ["${var.server_subnets}"],
+  "public_subnets": ["${var.client_subnets}"]
 }
 EOF
 }
@@ -58,7 +58,6 @@ resource "aws_launch_configuration" "vpx-lc" {
   image_id      = "${data.aws_ami.netscalervpx.id}"
   instance_type = "${lookup(var.allowed_sizes, var.vpx_size)}"
 
-  # Security group
   #user_data       = "${file("${path.module}/userdata.sh")}"
   key_name        = "${var.key_name}"
   iam_instance_profile = "${aws_iam_instance_profile.CitrixNodesProfile.id}"
