@@ -41,6 +41,9 @@ def get_instance(instance_id):
 def attach_eip(public_ips_str, interface_id):
     filters = [{'Name': 'domain', 'Values': ['vpc']}]
     public_ips = public_ips_str.split(",")
+    if len(public_ips) == 0:
+        logger.warn("No public ips found in lifecycle hook metadata")
+        return
     addresses = ec2_client.describe_addresses(PublicIps=public_ips,
                                               Filters=filters)['Addresses']
     free_addr = None
@@ -112,12 +115,23 @@ def lambda_handler(event, context):
     except KeyError as ke:
         logger.warn("Bailing since we can't get the required variable: " +
                     ke.args[0])
+        complete_lifecycle_action(event, instance_id, 'ABANDON')
         return
 
     if event['detail-type'] == "EC2 Instance-launch Lifecycle Action":
+        if public_ips == '' or len(public_ips.split(',')) == 0:
+            logger.warn("Bailing since there are no public ips supplied")
+            complete_lifecycle_action(event, instance_id, 'ABANDON')
+            return
         instance = get_instance(instance_id)
+        if instance is None:
+            logger.warn("Bailing since we couldn't find the instance id")
+            complete_lifecycle_action(event, instance_id, 'ABANDON')
+            return
+
         az = instance['Placement']['AvailabilityZone']
         vpc_id = instance['VpcId']
+        asg_name = event['detail']['AutoScalingGroupName']
 
         ns_url = 'http://{}:80/'.format(instance['PrivateIpAddress'])  # TODO:https
         logger.info("ns_url=" + ns_url)
@@ -128,13 +142,16 @@ def lambda_handler(event, context):
         eip_assoc = None
         try:
             logger.info("Going to create client interface, subnet=" + str(public_subnet))
-            client_interface = create_interface(public_subnet['SubnetId'], client_sg)
+            client_interface = create_interface(public_subnet['SubnetId'],
+                                                client_sg, asg_name, "public")
             logger.info("Going to attach client interface")
             attach_interface(client_interface['NetworkInterfaceId'], instance_id, 1)
-            server_interface = create_interface(private_subnet['SubnetId'], server_sg)
+            server_interface = create_interface(private_subnet['SubnetId'],
+                                                server_sg, asg_name, "server")
             attach_interface(server_interface['NetworkInterfaceId'], instance_id, 2)
             eip_assoc = attach_eip(public_ips, client_interface['NetworkInterfaceId'])
             configure_snip(instance_id, ns_url, server_interface, private_subnet)
+            complete_lifecycle_action(event, instance_id, 'CONTINUE')
         except:
             logger.warn("Caught exception: " + str(sys.exc_info()[:2]))
             if eip_assoc:
@@ -148,20 +165,23 @@ def lambda_handler(event, context):
                 logger.warn("Removing server network interface {} after attachment failed.".format(
                     server_interface['NetworkInterfaceId']))
                 delete_interface(server_interface)
-
-        try:
-            asg_client.complete_lifecycle_action(
-                LifecycleHookName=event['detail']['LifecycleHookName'],
-                AutoScalingGroupName=event['detail']['AutoScalingGroupName'],
-                LifecycleActionToken=event['detail']['LifecycleActionToken'],
-                LifecycleActionResult='CONTINUE'
-            )
-        except botocore.exceptions.ClientError as e:
-            logger.warn("Error completing life cycle hook for instance {}: {}".format(
-                instance_id, e.response['Error']['Code']))
+            complete_lifecycle_action(event, instance_id, 'ABANDON')
 
 
-def create_interface(subnet_id, security_groups):
+def complete_lifecycle_action(event, instance_id, action):
+    try:
+        asg_client.complete_lifecycle_action(
+            LifecycleHookName=event['detail']['LifecycleHookName'],
+            AutoScalingGroupName=event['detail']['AutoScalingGroupName'],
+            LifecycleActionToken=event['detail']['LifecycleActionToken'],
+            LifecycleActionResult=action,
+        )
+    except botocore.exceptions.ClientError as e:
+        logger.warn("Error completing life cycle hook for instance {}: {}".format(
+            instance_id, e.response['Error']['Code']))
+
+
+def create_interface(subnet_id, security_groups, asg_name, subnet_type):
     network_interface_id = None
     if subnet_id:
         try:
@@ -171,6 +191,9 @@ def create_interface(subnet_id, security_groups):
             network_interface_id = network_interface[
                 'NetworkInterface']['NetworkInterfaceId']
             logger.info("Created network interface: {}".format(network_interface_id))
+            eni_tag = asg_name + "-" + subnet_type
+            ec2_client.create_tags(Resources=[network_interface_id],
+                                   Tags=[{'Key': 'Name', 'Value': eni_tag}])
             return network_interface['NetworkInterface']
 
         except botocore.exceptions.ClientError as e:
@@ -192,12 +215,14 @@ def attach_interface(network_interface_id, instance_id, index):
             )
             attachment = attach_interface['AttachmentId']
             logger.info("Created network attachment: {}".format(attachment))
-
         except botocore.exceptions.ClientError as e:
             logger.warn("Error attaching network interface: {}".format(
                 e.response['Error']['Code']))
             raise
 
+        ec2_client.modify_network_interface_attribute(
+            Attachment={'AttachmentId': attachment, 'DeleteOnTermination': True},
+            NetworkInterfaceId=network_interface_id)
     return attachment
 
 
