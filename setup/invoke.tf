@@ -1,8 +1,8 @@
 /* invoke the lambda every 15 minutes */
 resource "aws_cloudwatch_event_rule" "invoke_lambda_periodic" {
-    depends_on = ["module.vpx", "module.lambda"]
+    depends_on = ["module.lambda"]
     name = "invoke_lambda_periodic"
-    schedule_expression = "rate(15 minutes)"
+    schedule_expression = "rate(5 minutes)"
 }
 
 resource "aws_cloudwatch_event_target" "invoke_lambda_periodic" {
