@@ -1,4 +1,4 @@
-/* The following finds the latest 10Mbps Enterprise edition AMI*/
+/* The following finds the latest 1000Mbps Standard edition AMI*/
 data "aws_ami" "netscalervpx" {
   most_recent = true
   filter {
@@ -11,7 +11,7 @@ data "aws_ami" "netscalervpx" {
   }
   filter {
     name = "product-code"
-    values = ["9gwd6wx07zoi4fa1hrw9r2j03"]
+    values = ["7rj9rmm05kihjjlsqkj6gni1x"]
   }
 }
 
@@ -49,7 +49,8 @@ resource "aws_autoscaling_group" "vpx-asg" {
   "server_security_group" : "${var.server_security_group}",
   "public_ips": "${var.public_ips}",
   "private_subnets": ["${var.server_subnets}"],
-  "public_subnets": ["${var.client_subnets}"]
+  "public_subnets": ["${var.client_subnets}"],
+  "config_function_name": "${var.config_function_name}"
 }
 EOF
 }

@@ -9,6 +9,7 @@ variable "public_ips" {}
 variable "server_security_group" {}
 variable "client_security_group" {}
 variable "key_name" {}
+variable "config_function_name" {}
 variable "allowed_sizes" {
    type = "map"
    description = "list of allowed vpx sizes"
