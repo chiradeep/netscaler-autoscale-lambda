@@ -14,12 +14,14 @@ resource "aws_iam_policy" "lifecycle_lambda_access" {
             "ec2:DetachNetworkInterface",
             "ec2:DeleteNetworkInterface",
             "ec2:AttachNetworkInterface",
+            "ec2:ModifyNetworkInterfaceAttribute",
+            "ec2:CreateTags",
             "ec2:DescribeInstances",
-            "autoscaling:CompleteLifecycleAction",
 	    "ec2:AllocateAddress",
 	    "ec2:AssociateAddress",
 	    "ec2:DescribeAddresses",
-	    "ec2:DisassociateAddress"
+	    "ec2:DisassociateAddress",
+            "autoscaling:CompleteLifecycleAction"
         ],
         "Effect": "Allow",
         "Resource": "*"
@@ -86,11 +88,11 @@ resource "aws_security_group_rule" "allow_lambda_access_to_netscaler" {
  */
 resource "aws_lambda_function" "netscaler_lifecycle_lambda" {
     filename = "${path.module}/../../lifecycle.zip"
-    function_name = "${var.name}-netscaler_lifecycle_lambda"
+    function_name = "${var.name}-netscaler_vpx_lifecycle_lambda"
     role = "${aws_iam_role.role_for_netscaler_lifecycle_lambda.arn}"
     handler = "handler.lambda_handler"
     runtime = "python2.7"
-    timeout = 90
+    timeout = 180
     memory_size = 128
     source_code_hash = "${base64sha256(file("${path.module}/../../lifecycle.zip"))}"
     vpc_config {
