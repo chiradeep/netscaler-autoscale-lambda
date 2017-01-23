@@ -22,7 +22,7 @@ output "ami_id" {
 resource "aws_autoscaling_group" "vpx-asg" {
   name                 =  "${var.name}-ns-autoscale-vpx-asg"
   max_size             = 4
-  min_size             = 1
+  min_size             = 0
   desired_capacity     = 1
   force_delete         = true
   launch_configuration = "${aws_launch_configuration.vpx-lc.name}"
@@ -30,6 +30,8 @@ resource "aws_autoscaling_group" "vpx-asg" {
         create_before_destroy  = true
   }
   vpc_zone_identifier = ["${var.nsip_subnet}"]
+  # do not wait for minimum number of instances to reach InService
+  wait_for_capacity_timeout = 0
 
   tag {
     key                 = "Name"
@@ -38,12 +40,12 @@ resource "aws_autoscaling_group" "vpx-asg" {
   }
   initial_lifecycle_hook {
     name                   = "ns-vpx-lifecycle-hook"
-    default_result         = "CONTINUE"
-    heartbeat_timeout      = 180
+    default_result         = "ABANDON"
+    heartbeat_timeout      = 900
     lifecycle_transition   = "autoscaling:EC2_INSTANCE_LAUNCHING"
     notification_metadata = <<EOF
 {
-  "client_security_group" : "${var.client_security_group}",
+  "client_security_group" : "${aws_security_group.client_sg.id}",
   "server_security_group" : "${var.server_security_group}",
   "public_ips": "${var.public_ips}",
   "private_subnets": ["${var.server_subnets}"],

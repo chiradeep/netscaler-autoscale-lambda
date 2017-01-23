@@ -11,5 +11,5 @@ module "vpx" {
   nsip_subnet = "${module.vpc.private_subnets[0]}"
   vpc_id = "${module.vpc.vpc_id}"
   key_name = "${var.key_name}"
-  public_ips = "${aws_eip.public_lb_ip.public_ip}"
+  public_ips = "${join(",", aws_eip.public_lb_ip.*.public_ip)}"
 }
