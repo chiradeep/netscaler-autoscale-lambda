@@ -18,6 +18,8 @@ ec2_client = boto3.client('ec2')
 
 asg_client = boto3.client('autoscaling')
 
+lambda_client = boto3.client('lambda')
+
 
 def get_subnet(az, vpc_id, subnet_ids):
     filters = [{'Name': 'availability-zone', 'Values': [az]},
@@ -61,6 +63,38 @@ def attach_eip(public_ips_str, interface_id):
     return response['AssociationId']
 
 
+def configure_features(instance_id, ns_url):
+    NS_PASSWORD = os.getenv('NS_PASSWORD', instance_id)
+    if NS_PASSWORD == 'SAME_AS_INSTANCE_ID':
+        NS_PASSWORD = instance_id
+    url = ns_url + 'nitro/v1/config/nsfeature?action=enable'
+
+    retry_count = 0
+    retry = True
+    jsons = '{"nsfeature": {"feature": ["LB", "CS", "SSL", "WL"]}}'  # standard edition features
+    headers = {'Content-Type': 'application/json', 'X-NITRO-USER': 'nsroot', 'X-NITRO-PASS': NS_PASSWORD}
+    r = urllib2.Request(url, data=jsons, headers=headers)
+    while retry:
+        try:
+            urllib2.urlopen(r)
+            logger.info("Configured features")
+            retry = False
+        except urllib2.HTTPError as hte:
+            if hte.code != 409:
+                logger.info("Error configuring features: Error code: " +
+                            str(hte.code) + ", reason=" + hte.reason)
+                if hte.code == 503:  # service unavailable, just sleep and try again
+                    retry_count += retry_count + 1
+                    if retry_count > 9:
+                        retry = False
+                        break
+                    logger.info("NS VPX is not ready to be configured, retrying in 10 seconds")
+                    time.sleep(10)
+            else:
+                logger.info("Features already configured")
+                retry = False
+
+
 def configure_snip(instance_id, ns_url, server_eni, server_subnet):
     # the SNIP is unconfigured on a freshly installed VPX. We don't
     # know if the SNIP is already configured, but try anyway. Ignore
@@ -99,6 +133,10 @@ def configure_snip(instance_id, ns_url, server_eni, server_subnet):
             else:
                 logger.info("SNIP already configured")
                 retry = False
+
+
+def invoke_config_lambda(config_function_name, event):
+    lambda_client.invoke_async(FunctionName=config_function_name, InvokeArgs='{}')
 
 
 def lambda_handler(event, context):
@@ -143,14 +181,22 @@ def lambda_handler(event, context):
         try:
             logger.info("Going to create client interface, subnet=" + str(public_subnet))
             client_interface = create_interface(public_subnet['SubnetId'],
-                                                client_sg, asg_name, "public")
+                                                client_sg, asg_name,
+                                                'ENI connected to client subnet',
+                                                "public")
             logger.info("Going to attach client interface")
             attach_interface(client_interface['NetworkInterfaceId'], instance_id, 1)
+            logger.info("Going to create server interface, subnet=" + str(private_subnet))
             server_interface = create_interface(private_subnet['SubnetId'],
-                                                server_sg, asg_name, "server")
+                                                server_sg, asg_name,
+                                                'ENI connected to server subnet',
+                                                "server")
+            logger.info("Going to attach server interface")
             attach_interface(server_interface['NetworkInterfaceId'], instance_id, 2)
+            logger.info("Going to attach elastic ip")
             eip_assoc = attach_eip(public_ips, client_interface['NetworkInterfaceId'])
             configure_snip(instance_id, ns_url, server_interface, private_subnet)
+            configure_features(instance_id, ns_url)
             complete_lifecycle_action(event, instance_id, 'CONTINUE')
         except:
             logger.warn("Caught exception: " + str(sys.exc_info()[:2]))
@@ -167,6 +213,14 @@ def lambda_handler(event, context):
                 delete_interface(server_interface)
             complete_lifecycle_action(event, instance_id, 'ABANDON')
 
+        if metadata.get('config_function_name'):
+            logger.info("Going to invoke config lambda")
+            try:
+                invoke_config_lambda(metadata.get('config_function_name'), event)
+                logger.info("Invoked config lambda")
+            except:
+                logger.warn("Caught exception: " + str(sys.exc_info()[:2]))
+
 
 def complete_lifecycle_action(event, instance_id, action):
     try:
@@ -181,11 +235,12 @@ def complete_lifecycle_action(event, instance_id, action):
             instance_id, e.response['Error']['Code']))
 
 
-def create_interface(subnet_id, security_groups, asg_name, subnet_type):
+def create_interface(subnet_id, security_groups, asg_name, descr, subnet_type):
     network_interface_id = None
     if subnet_id:
         try:
             network_interface = ec2_client.create_network_interface(
+                Description=descr,
                 SubnetId=subnet_id,
                 Groups=[security_groups])
             network_interface_id = network_interface[
