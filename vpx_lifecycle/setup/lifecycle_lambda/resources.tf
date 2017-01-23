@@ -21,7 +21,8 @@ resource "aws_iam_policy" "lifecycle_lambda_access" {
 	    "ec2:AssociateAddress",
 	    "ec2:DescribeAddresses",
 	    "ec2:DisassociateAddress",
-            "autoscaling:CompleteLifecycleAction"
+            "autoscaling:CompleteLifecycleAction",
+            "lambda:InvokeFunction" 
         ],
         "Effect": "Allow",
         "Resource": "*"
