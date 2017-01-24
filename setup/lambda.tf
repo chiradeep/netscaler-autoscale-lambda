@@ -3,8 +3,8 @@ module "lambda" {
 
   name = "${var.base_name}"
   netscaler_vpc_id = "${module.vpc.vpc_id}"
-  netscaler_vpc_nsip_subnet_ids = "${module.vpc.private_subnets}"
-  netscaler_vpc_client_subnet_ids = "${module.vpc.public_subnets}"
+  netscaler_vpc_nsip_subnet_ids = ["${module.vpc.private_subnets}"]
+  netscaler_vpc_client_subnet_ids = ["${module.vpc.public_subnets}"]
   netscaler_security_group_id = "${module.vpc.default_security_group_id}"
 
   autoscaling_group_backend_name = "${module.asg.asg_name}"

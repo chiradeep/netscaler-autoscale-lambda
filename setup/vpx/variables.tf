@@ -1,8 +1,14 @@
 variable "name" {}
 variable "vpx_size" {}
-variable "server_subnets" {}
-variable "client_subnets" {}
-variable "nsip_subnet" {}
+variable "server_subnets" {
+    type = "list"
+}
+variable "client_subnets" {   
+    type = "list"
+}
+variable "nsip_subnet" {
+    type = "list"
+}
 variable "vpc_id" {}
 variable "security_group_id" {}
 variable "public_ips" {}

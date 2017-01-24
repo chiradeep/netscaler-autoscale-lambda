@@ -23,7 +23,7 @@ resource "aws_autoscaling_group" "vpx-asg" {
   name                 =  "${var.name}-ns-autoscale-vpx-asg"
   max_size             = 4
   min_size             = 0
-  desired_capacity     = 1
+  desired_capacity     = 2
   force_delete         = true
   launch_configuration = "${aws_launch_configuration.vpx-lc.name}"
   lifecycle {
@@ -48,8 +48,8 @@ resource "aws_autoscaling_group" "vpx-asg" {
   "client_security_group" : "${aws_security_group.client_sg.id}",
   "server_security_group" : "${var.server_security_group}",
   "public_ips": "${var.public_ips}",
-  "private_subnets": ["${var.server_subnets}"],
-  "public_subnets": ["${var.client_subnets}"],
+  "private_subnets": ${jsonencode(var.server_subnets)},
+  "public_subnets": ${jsonencode(var.client_subnets)},
   "config_function_name": "${var.config_function_name}"
 }
 EOF
