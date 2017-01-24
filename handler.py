@@ -217,6 +217,7 @@ def configure_snip(vpx_info):
         try:
             urllib2.urlopen(r)
             logger.info("Configured SNIP: snip= " + snip)
+            configure_features(vpx_info['instance_id'], vpx_info['ns_url'])
             retry = False
         except urllib2.HTTPError as hte:
             if hte.code != 409:
@@ -257,7 +258,6 @@ def configure_vpx(vpx_info, services):
 
     logger.info(vpx_info)
     configure_snip(vpx_info)
-    configure_features(instance_id, vpx_info['ns_url'])
 
     fetch_tfstate(state_bucket, instance_id)
 
