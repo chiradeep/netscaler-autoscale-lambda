@@ -4,6 +4,7 @@ resource "aws_vpc_endpoint" "private-s3" {
     route_table_ids = ["${module.vpc.private_route_table_ids[0]}"]
     policy = <<POLICY
 {
+    "Version": "2008-10-17",
     "Statement": [
         {
             "Action": "*",
