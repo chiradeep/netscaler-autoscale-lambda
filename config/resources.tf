@@ -11,6 +11,6 @@ resource "netscaler_servicegroup" "backend" {
   lbvserver = "${netscaler_lbvserver.production_lb.name}"
   servicetype = "HTTP"
   clttimeout = "${lookup(var.backend_service_config, "clttimeout")}"
-  servicegroupmembers = "${formatlist("%s:%s", var.backend_services, var.backend_service_config["backend_port"])}"
+  servicegroupmembers = "${formatlist("%s:%s:1", var.backend_services, var.backend_service_config["backend_port"])}"
 }
 
