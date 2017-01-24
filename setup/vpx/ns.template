@@ -12,6 +12,10 @@
             "Type": "AWS::EC2::VPC::Id",
             "Description": "VpcId of your existing Virtual Private Cloud (VPC)"
         },
+        "AMI" : {
+            "Type": "AWS::EC2::Image::Id",
+            "Description": "VPX AMI to use"
+        },
         "VPX": {
             "ConstraintDescription": "Must be a valid EC2 instance type.",
             "Type": "String",
@@ -226,21 +230,7 @@
                     }
                 ],
                 "ImageId": {
-                    "Fn::FindInMap": [
-                        "AWSRegionArch2AMI",
-                        {
-                            "Ref": "AWS::Region"
-                        },
-                        {
-                            "Fn::FindInMap": [
-                                "AWSInstanceType2Arch",
-                                {
-                                    "Ref": "VPX"
-                                },
-                                "Arch"
-                            ]
-                        }
-                    ]
+                    "Ref": "AMI"
                 },
                 "KeyName": {
                     "Ref": "KeyName"
@@ -294,145 +284,5 @@
             }
         }
 
-    },
-    "Mappings": {
-        "AWSRegionArch2AMI": {
-            "us-east-1": {
-                "32": "NOT_YET_SUPPORTED",
-                "64": "ami-c399acd4",
-                "64Cluster": "NOT_YET_SUPPORTED",
-                "64GPU": "NOT_YET_SUPPORTED"
-            },
-        "us-east-2": {
-                "32": "NOT_YET_SUPPORTED",
-                "64": "ami-27752f42",
-                "64Cluster": "NOT_YET_SUPPORTED",
-                "64GPU": "NOT_YET_SUPPORTED"
-            },
-            "ap-northeast-1": {
-                "32": "NOT_YET_SUPPORTED",
-                "64": "ami-00c37661",
-                "64Cluster": "NOT_YET_SUPPORTED",
-                "64GPU": "NOT_YET_SUPPORTED"
-            },
-            "sa-east-1": {
-                "32": "NOT_YET_SUPPORTED",
-                "64": "ami-18d74974",
-                "64Cluster": "NOT_YET_SUPPORTED",
-                "64GPU": "NOT_YET_SUPPORTED"
-            },
-            "ap-northeast-2": {
-                "32": "NOT_YET_SUPPORTED",
-                "64": "ami-65be690b",
-                "64Cluster": "NOT_YET_SUPPORTED",
-                "64GPU": "NOT_YET_SUPPORTED"
-            },
-            "ap-southeast-1": {
-                "32": "NOT_YET_SUPPORTED",
-                "64": "ami-68c96b0b",
-                "64Cluster": "NOT_YET_SUPPORTED",
-                "64GPU": "NOT_YET_SUPPORTED"
-            },
-            "ap-southeast-2": {
-                "32": "NOT_YET_SUPPORTED",
-                "64": "ami-86427ce5",
-                "64Cluster": "NOT_YET_SUPPORTED",
-                "64GPU": "NOT_YET_SUPPORTED"
-            },
-            "us-west-2": {
-                "32": "NOT_YET_SUPPORTED",
-                "64": "ami-76f95516",
-                "64Cluster": "NOT_YET_SUPPORTED",
-                "64GPU": "NOT_YET_SUPPORTED"
-            },
-            "us-west-1": {
-                "32": "NOT_YET_SUPPORTED",
-                "64": "ami-e8e5b088",
-                "64Cluster": "NOT_YET_SUPPORTED",
-                "64GPU": "NOT_YET_SUPPORTED"
-            },
-            "eu-central-1": {
-                "32": "NOT_YET_SUPPORTED",
-                "64": "ami-2d488d42",
-                "64Cluster": "NOT_YET_SUPPORTED",
-                "64GPU": "NOT_YET_SUPPORTED"
-            },
-          "ap-south-1": {
-                "32": "NOT_YET_SUPPORTED",
-                "64": "ami-c2c3b7ad",
-                "64Cluster": "NOT_YET_SUPPORTED",
-                "64GPU": "NOT_YET_SUPPORTED"
-            },
-            "eu-west-1": {
-                "32": "NOT_YET_SUPPORTED",
-                "64": "ami-23570550",
-                "64Cluster": "NOT_YET_SUPPORTED",
-                "64GPU": "NOT_YET_SUPPORTED"
-            }
-        },
-        "AWSInstanceType2Arch": {
-            "m3.2xlarge": {
-                "Arch": "64"
-            },
-            "m4.2xlarge": {
-                "Arch": "64"
-            },
-            "m4.xlarge": {
-                "Arch": "64"
-            },
-            "m3.large": {
-                "Arch": "64"
-            },
-            "m4.large": {
-                "Arch": "64"
-            },
-            "m4.4xlarge": {
-                "Arch": "64"
-            },
-            "m4.10xlarge": {
-                "Arch": "64"
-            },
-            "m3.xlarge": {
-                "Arch": "64"
-            }
-        },
-        "AWSVPXAMI": {
-            "us-east-1": {
-                "AMI": "ami-c399acd4"
-            },
-            "us-east-2": {
-                "AMI": "ami-27752f42"
-            },
-            "ap-northeast-1": {
-                "AMI": "ami-00c37661"
-            },
-            "sa-east-1": {
-                "AMI": "ami-18d74974"
-            },
-            "ap-northeast-2": {
-                "AMI": "ami-65be690b"
-            },
-            "ap-southeast-1": {
-                "AMI": "ami-68c96b0b"
-            },
-            "ap-southeast-2": {
-                "AMI": "ami-86427ce5"
-            },
-            "us-west-2": {
-                "AMI": "ami-76f95516"
-            },
-            "us-west-1": {
-                "AMI": "ami-e8e5b088"
-            },
-            "eu-central-1": {
-                "AMI": "ami-2d488d42"
-            },
-           "ap-south-1": {
-                "AMI": "ami-c2c3b7ad"
-            },
-            "eu-west-1": {
-                "AMI": "ami-23570550"
-            }
-        }
     }
 }
