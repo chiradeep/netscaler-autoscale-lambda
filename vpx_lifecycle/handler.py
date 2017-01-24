@@ -83,13 +83,15 @@ def configure_features(instance_id, ns_url):
             if hte.code != 409:
                 logger.info("Error configuring features: Error code: " +
                             str(hte.code) + ", reason=" + hte.reason)
-                if hte.code == 503:  # service unavailable, just sleep and try again
+                if hte.code == 503 or hte.code == 401:  # service unavailable, just sleep and try again
                     retry_count += retry_count + 1
                     if retry_count > 9:
                         retry = False
                         break
                     logger.info("NS VPX is not ready to be configured, retrying in 10 seconds")
                     time.sleep(10)
+                else:
+                    retry = False
             else:
                 logger.info("Features already configured")
                 retry = False
