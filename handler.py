@@ -291,8 +291,8 @@ def configure_vpx(vpx_info, services):
 
 def handler(event, context):
     try:
-        nsip_subnet_ids = os.environ['NS_VPX_NSIP_SUBNET_IDS'].split(',')
-        client_subnet_ids = os.environ['NS_VPX_CLIENT_SUBNET_IDS'].split(',')
+        nsip_subnet_ids = os.environ['NS_VPX_NSIP_SUBNET_IDS'].split('|')
+        client_subnet_ids = os.environ['NS_VPX_CLIENT_SUBNET_IDS'].split('|')
         vpx_tag_key = os.environ['NS_VPX_TAG_KEY']
         vpx_tag_value = os.environ['NS_VPX_TAG_VALUE']
         nsip_eni_description = os.environ['NS_VPX_NSIP_ENI_DESCR']
