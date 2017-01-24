@@ -12,6 +12,7 @@ Components of the config are:
 
 * Autoscaling Group (asg) deployed in the private subnet, in the default security group. The instances are Ubuntu 16 instances with NGINX installed / running.
 * VPX deployment in the public / private subnets using CloudFormation
+    - Deploys the latest VPX 1000 Mbps Standard Edition (see [Marketplace](https://aws.amazon.com/marketplace/pp/B00AA00Q7W) for pricing)
     - NSIP ENI attached to private subnet, in the default security group
     - Server ENI attached to private subnet, in the default security group
     - Client ENI attached to public subnet 
@@ -25,7 +26,7 @@ Components of the config are:
 	- DynamoDb table for Mutual exclusion
 * VPC Endpoint to AWS S3, allowing lambda access to S3
 * A Linux jumpbox in the public subnet with security group rules allowing it access to the VPX private ENIs and ssh access from the Internet. Jumpbox has an auto-assigned public IP.
-* A periodic CloudWatch event (see `invoke.tf`) that triggers the lambda function every 15 minutes. This is to provoke the initial config of the VPX SNIP and the initial VPX LB configuration. However, the first invoke may fail since the VPX may not have completed its internal initialization. Subsequent invokes should succeed. The periodic invocation should also take care of those scenarios where the regular lambda invocation failed due to various reasons (
+* A periodic CloudWatch event (see `invoke.tf`) that triggers the lambda function every 5 minutes. This is to provoke the initial config of the VPX SNIP and the initial VPX LB configuration. However, the first invoke may fail since the VPX may not have completed its internal initialization. Subsequent invokes should succeed. The periodic invocation should also take care of those scenarios where the regular lambda invocation failed due to various reasons (
 
 <img src="../docs/aws_vpx_single.png" width="720"/>
 
@@ -40,6 +41,7 @@ make package-config
 ```
 
 # Input vars
+
 * Region
 * Keypair name that matches the region name
 * Base name to derive names of AWS resources. Since this derives S3 bucket names, keep it short and conformant to DNS naming conventions.
@@ -72,5 +74,3 @@ Copy `lambda.tf` and the `lambda` subdirectory to a different location and make 
 # BUGS
 `terraform destroy` may hang while trying to destroy the VPC. This is because creating the lambda function automatically creates an ENI (unknown to terraform). Deleting the lambda does not delete the ENI. This may be fixed in later versions of terraform (> v0.8.1)
 
-# TODO
-* Install the license file in the VPX from an S3 bucket. New VPXs do not come with license files already installed
