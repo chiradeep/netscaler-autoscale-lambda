@@ -33,12 +33,15 @@ def random_name():
     return base64.b32encode(str(uuid.uuid4()))[:8]
 
 
-def fetch_asg_instance_ips(asg):
+def fetch_asg_instance_ips(asg, az):
     result = []
+    logger.info("Looking for instances in ASG:" + asg + " in AZ: " + az)
     groups = asg_client.describe_auto_scaling_groups(AutoScalingGroupNames=[asg])
     for group in groups['AutoScalingGroups']:
         instances = group['Instances']
         for instance in instances:
+            if instance['AvailabilityZone'] != az:
+                continue
             instance_id = instance['InstanceId']
             ec2_reservations = ec2_client.describe_instances(InstanceIds=[instance_id])
             for reservation in ec2_reservations['Reservations']:
@@ -75,6 +78,7 @@ def find_ns_vpx_instances(tagkey, tagvalue, nsip_subnet_ids, client_subnet_ids,
             if instance['State']['Name'] != 'running':
                 continue
             instance_info['instance_id'] = instance_id
+            instance_info['az'] = instance['Placement']['AvailabilityZone']
             for eni in instance['NetworkInterfaces']:
                 logger.info("Found ENI for instance " + instance_id + ", id=" +
                             eni['NetworkInterfaceId'] + ", descr=" +
@@ -265,9 +269,8 @@ def handler(event, context):
         logger.warn("No NetScaler instances to configure!, Exiting")
         return
 
-    services = ""
-    for s in fetch_asg_instance_ips(asg):
-        services = services + '"' + s + '",'
-
     for vpx_info in vpx_instances:
+        services = ""
+        for s in fetch_asg_instance_ips(asg, vpx_info['az']):
+            services = services + '"' + s + '",'
         configure_vpx(vpx_info, services)
