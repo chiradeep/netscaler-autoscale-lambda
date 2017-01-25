@@ -5,4 +5,3 @@ output "lambda_name" {
 output "lambda_arn" {
   value = "${aws_lambda_function.netscaler_lifecycle_lambda.arn}"
 }
-
