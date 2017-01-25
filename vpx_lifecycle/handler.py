@@ -63,6 +63,40 @@ def attach_eip(public_ips_str, interface_id):
     return response['AssociationId']
 
 
+def save_config(instance_id, ns_url):
+    NS_PASSWORD = os.getenv('NS_PASSWORD', instance_id)
+    if NS_PASSWORD == 'SAME_AS_INSTANCE_ID':
+        NS_PASSWORD = instance_id
+    url = ns_url + 'nitro/v1/config/nsconfig?action=save'
+
+    jsons = '{"nsconfig":{}}'
+    headers = {'Content-Type': 'application/json', 'X-NITRO-USER': 'nsroot', 'X-NITRO-PASS': NS_PASSWORD}
+    r = urllib2.Request(url, data=jsons, headers=headers)
+    try:
+        urllib2.urlopen(r)
+        logger.info("Saved config")
+    except urllib2.HTTPError as hte:
+        logger.info("Error saving config: Error code: " +
+                    str(hte.code) + ", reason=" + hte.reason)
+
+
+def reboot(instance_id, ns_url):
+    NS_PASSWORD = os.getenv('NS_PASSWORD', instance_id)
+    if NS_PASSWORD == 'SAME_AS_INSTANCE_ID':
+        NS_PASSWORD = instance_id
+    url = ns_url + 'nitro/v1/config/reboot'
+
+    jsons = '{"reboot":{ "warm":"true"}}'
+    headers = {'Content-Type': 'application/json', 'X-NITRO-USER': 'nsroot', 'X-NITRO-PASS': NS_PASSWORD}
+    r = urllib2.Request(url, data=jsons, headers=headers)
+    try:
+        urllib2.urlopen(r)
+        logger.info("Done warm reboot")
+    except urllib2.HTTPError as hte:
+        logger.info("Error rebooting: Error code: " +
+                    str(hte.code) + ", reason=" + hte.reason)
+
+
 def configure_features(instance_id, ns_url):
     NS_PASSWORD = os.getenv('NS_PASSWORD', instance_id)
     if NS_PASSWORD == 'SAME_AS_INSTANCE_ID':
@@ -186,19 +220,25 @@ def lambda_handler(event, context):
                                                 client_sg, asg_name,
                                                 'ENI connected to client subnet',
                                                 "public")
-            logger.info("Going to attach client interface")
-            attach_interface(client_interface['NetworkInterfaceId'], instance_id, 1)
             logger.info("Going to create server interface, subnet=" + str(private_subnet))
             server_interface = create_interface(private_subnet['SubnetId'],
                                                 server_sg, asg_name,
                                                 'ENI connected to server subnet',
                                                 "server")
-            logger.info("Going to attach server interface")
-            attach_interface(server_interface['NetworkInterfaceId'], instance_id, 2)
             logger.info("Going to attach elastic ip")
             eip_assoc = attach_eip(public_ips, client_interface['NetworkInterfaceId'])
+            # pause to allow VPX to initialize
+            time.sleep(20)
+            logger.info("Going to attach client interface")
+            attach_interface(client_interface['NetworkInterfaceId'], instance_id, 1)
+            logger.info("Going to attach server interface")
+            attach_interface(server_interface['NetworkInterfaceId'], instance_id, 2)
             configure_snip(instance_id, ns_url, server_interface, private_subnet)
             configure_features(instance_id, ns_url)
+            time.sleep(20)
+            save_config(instance_id, ns_url)
+            reboot(instance_id, ns_url)
+            time.sleep(10)
             complete_lifecycle_action(event, instance_id, 'CONTINUE')
         except:
             logger.warn("Caught exception: " + str(sys.exc_info()[:2]))
