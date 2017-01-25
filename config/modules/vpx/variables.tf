@@ -1,5 +1,10 @@
 variable "name" {}
 variable "vpx_size" {}
+
+variable "vpx_asg_desired" {
+  description = "The number of VPX desired in the autoscaling group. Usually 1 per zone"
+}
+
 variable "server_subnets" {
     type = "list"
 }
