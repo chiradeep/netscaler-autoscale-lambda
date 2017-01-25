@@ -88,14 +88,14 @@ resource "aws_security_group_rule" "allow_lambda_access_to_netscaler" {
  * This lambda function executes inside a VPC and reacts to vpx autoscaling lifecycle hooks
  */
 resource "aws_lambda_function" "netscaler_lifecycle_lambda" {
-    filename = "${path.module}/../../lifecycle.zip"
+    filename = "${path.module}/../../../vpx_lifecycle/lifecycle.zip"
     function_name = "${var.name}-netscaler_vpx_lifecycle_lambda"
     role = "${aws_iam_role.role_for_netscaler_lifecycle_lambda.arn}"
     handler = "handler.lambda_handler"
     runtime = "python2.7"
     timeout = 300
     memory_size = 128
-    source_code_hash = "${base64sha256(file("${path.module}/../../lifecycle.zip"))}"
+    source_code_hash = "${base64sha256(file("${path.module}/../../../vpx_lifecycle/lifecycle.zip"))}"
     vpc_config {
         subnet_ids = ["${var.netscaler_vpc_nsip_subnet_ids}"]
         security_group_ids = ["${aws_security_group.lifecycle_lambda_security_group.id}"]

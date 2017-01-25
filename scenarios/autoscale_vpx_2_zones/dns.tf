@@ -1,5 +1,5 @@
 module "dns" {
-   source = "./dns"
+   source = "../../config/modules/dns"
    dns_enabled = false
    zone_id = "Z1PC0CAHCW564V"
    name = "cloudnativevpx"

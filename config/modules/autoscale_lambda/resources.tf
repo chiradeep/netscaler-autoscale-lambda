@@ -36,8 +36,8 @@ resource "aws_s3_bucket" "state_bucket" {
 resource "aws_s3_bucket_object" "config_zip" {
     bucket = "${aws_s3_bucket.config_bucket.id}"
     key = "config.zip"
-    source = "${path.module}/../../config.zip"
-    etag = "${md5(file("${path.module}/../../config.zip"))}"
+    source = "${path.module}/../../../workload_autoscale/config.zip"
+    etag = "${md5(file("${path.module}/../../../workload_autoscale/config.zip"))}"
 }
 
 
@@ -173,14 +173,14 @@ resource "aws_security_group_rule" "allow_lambda_access_to_netscaler" {
  * These environment variables are taken from the TF inputs to this TF config. 
  */
 resource "aws_lambda_function" "netscaler_autoscale_lambda" {
-    filename = "${path.module}/../../bundle.zip"
+    filename = "${path.module}/../../../workload_autoscale/bundle.zip"
     function_name = "${var.name}-netscaler_autoscale_lambda"
     role = "${aws_iam_role.role_for_netscaler_autoscale_lambda.arn}"
     handler = "handler.handler"
     runtime = "python2.7"
     timeout = 90
     memory_size = 128
-    source_code_hash = "${base64sha256(file("${path.module}/../../bundle.zip"))}"
+    source_code_hash = "${base64sha256(file("${path.module}/../../../workload_autoscale/bundle.zip"))}"
     environment {
         variables = {
             NS_LOGIN = "nsroot"

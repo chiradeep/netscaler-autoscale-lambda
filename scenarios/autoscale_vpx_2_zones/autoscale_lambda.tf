@@ -1,5 +1,5 @@
-module "lambda" {
-  source = "./lambda"
+module "autoscale_lambda" {
+  source = "../../config/modules/autoscale_lambda"
 
   name = "${var.base_name}"
   netscaler_vpc_id = "${module.vpc.vpc_id}"
@@ -7,7 +7,7 @@ module "lambda" {
   netscaler_vpc_client_subnet_ids = ["${module.vpc.public_subnets}"]
   netscaler_security_group_id = "${module.vpc.default_security_group_id}"
 
-  autoscaling_group_backend_name = "${module.asg.asg_name}"
+  autoscaling_group_backend_name = "${module.workload_asg.asg_name}"
 
   /* the following are taken from the CloudFormation template in vpx/ns.template */
   ns_vpx_tag_key  = "Name"

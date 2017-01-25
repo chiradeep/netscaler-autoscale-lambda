@@ -1,5 +1,5 @@
 module "lifecyle_lambda" {
-  source = "../vpx_lifecycle/setup/lifecycle_lambda"
+  source = "../../config/modules/lifecycle_lambda"
 
   name = "${var.base_name}"
   netscaler_vpc_id = "${module.vpc.vpc_id}"

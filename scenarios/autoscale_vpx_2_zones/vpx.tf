@@ -1,5 +1,5 @@
 module "vpx" {
-  source = "./vpx"
+  source = "../../config/modules/vpx"
 
   name = "${var.base_name}"
   vpx_size = "m3.large"
@@ -12,5 +12,5 @@ module "vpx" {
   vpc_id = "${module.vpc.vpc_id}"
   key_name = "${var.key_name}"
   public_ips = "${join(",", aws_eip.public_lb_ip.*.public_ip)}"
-  config_function_name = "${module.lambda.lambda_name}"
+  config_function_name = "${module.autoscale_lambda.lambda_name}"
 }

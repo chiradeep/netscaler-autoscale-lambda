@@ -1,5 +1,5 @@
-module "asg" {
-  source = "./asg"
+module "workload_asg" {
+  source = "../../config/modules/workload_asg"
 
   name = "${var.base_name}-asg"
   asg_security_group = "${module.vpc.default_security_group_id}"
