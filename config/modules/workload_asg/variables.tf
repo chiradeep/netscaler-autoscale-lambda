@@ -1,5 +1,4 @@
-variable "name" {
-}
+variable "name" {}
 
 variable "aws_region" {
   description = "The AWS region to create things in."
@@ -15,8 +14,8 @@ variable "aws_amis" {
 }
 
 variable "vpc_subnets" {
-   description = "List of subnets to launch the ASG in"
-   type = "list"
+  description = "List of subnets to launch the ASG in"
+  type        = "list"
 }
 
 variable "key_name" {
