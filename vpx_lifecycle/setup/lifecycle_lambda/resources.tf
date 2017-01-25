@@ -93,7 +93,7 @@ resource "aws_lambda_function" "netscaler_lifecycle_lambda" {
     role = "${aws_iam_role.role_for_netscaler_lifecycle_lambda.arn}"
     handler = "handler.lambda_handler"
     runtime = "python2.7"
-    timeout = 180
+    timeout = 300
     memory_size = 128
     source_code_hash = "${base64sha256(file("${path.module}/../../lifecycle.zip"))}"
     vpc_config {
