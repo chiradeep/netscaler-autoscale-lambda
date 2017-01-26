@@ -6,3 +6,20 @@
 * `workload_asg`  -  creates a test workload of Ubuntu servers running Apache2 that can be used to test the VPX
 * `dns` - configures a Route53 hosted zone with A records (typically the Elastic IPs attached to the VPXs)
 
+
+## Usage:
+
+```
+module "vpx" {
+  source = "github.com/chiradeep/netscaler-autoscale-lambda//config/module/vpx"
+
+  name              = "${var.base_name}"
+  vpx_size          = "m3.large"
+  key_name          = "${var.key_name}"
+  security_group_id = 
+  client_subnet     = 
+  server_subnet     = 
+  nsip_subnet       = 
+  vpc_id            = 
+}
+```
