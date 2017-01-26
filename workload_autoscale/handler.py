@@ -8,6 +8,7 @@ import zipfile
 import uuid
 import urllib2
 import base64
+import time
 from dyndbmutex import DynamoDbMutex
 
 logger = logging.getLogger()
@@ -168,6 +169,40 @@ def upload_tfstate(state_bucket, instance_id):
                 " to bucket " + state_bucket)
 
 
+def configure_features(instance_id, ns_url):
+    NS_PASSWORD = os.getenv('NS_PASSWORD', instance_id)
+    if NS_PASSWORD == 'SAME_AS_INSTANCE_ID':
+        NS_PASSWORD = instance_id
+    url = ns_url + 'nitro/v1/config/nsfeature?action=enable'
+
+    retry_count = 0
+    retry = True
+    jsons = '{"nsfeature": {"feature": ["LB", "CS", "SSL", "WL"]}}'  # standard edition features
+    headers = {'Content-Type': 'application/json', 'X-NITRO-USER': 'nsroot', 'X-NITRO-PASS': NS_PASSWORD}
+    r = urllib2.Request(url, data=jsons, headers=headers)
+    while retry:
+        try:
+            urllib2.urlopen(r)
+            logger.info("Configured features")
+            retry = False
+        except urllib2.HTTPError as hte:
+            if hte.code != 409:
+                logger.info("Error configuring features: Error code: " +
+                            str(hte.code) + ", reason=" + hte.reason)
+                if hte.code == 503 or hte.code == 401:  # service unavailable, just sleep and try again
+                    retry_count += retry_count + 1
+                    if retry_count > 9:
+                        retry = False
+                        break
+                    logger.info("NS VPX is not ready to be configured, retrying in 10 seconds")
+                    time.sleep(10)
+                else:
+                    retry = False
+            else:
+                logger.info("Features already configured")
+                retry = False
+
+
 def configure_snip(vpx_info):
     # the SNIP is unconfigured on a freshly installed VPX. We don't
     # know if the SNIP is already configured, but try anyway. Ignore
@@ -177,18 +212,31 @@ def configure_snip(vpx_info):
     password = vpx_info['instance_id']
     subnet = '255.255.255.0'  # TODO. We should get this from the subnet info
 
+    retry_count = 0
+    retry = True
     jsons = '{{"nsip":{{"ipaddress":"{}", "netmask":"{}", "type":"snip"}}}}'.format(snip, subnet)
     headers = {'Content-Type': 'application/json', 'X-NITRO-USER': 'nsroot', 'X-NITRO-PASS': password}
     r = urllib2.Request(url, data=jsons, headers=headers)
-    try:
-        urllib2.urlopen(r)
-        logger.info("Configured SNIP: snip= " + snip)
-    except urllib2.HTTPError as hte:
-        if hte.code != 409:
-            logger.info("Error configuring SNIP: Error code: " +
-                        str(hte.code) + ", reason=" + hte.reason)
-        else:
-            logger.info("SNIP already configured")
+    while retry:
+        try:
+            urllib2.urlopen(r)
+            logger.info("Configured SNIP: snip= " + snip)
+            configure_features(vpx_info['instance_id'], vpx_info['ns_url'])
+            retry = False
+        except urllib2.HTTPError as hte:
+            if hte.code != 409:
+                logger.info("Error configuring SNIP: Error code: " +
+                            str(hte.code) + ", reason=" + hte.reason)
+                if hte.code == 503:  # service unavailable, just sleep and try again
+                    retry_count += 1
+                    if retry_count > 9:
+                        retry = False
+                        break
+                    logger.info("NS VPX is not ready to be configured, retrying in 10 seconds")
+                    time.sleep(10)
+            else:
+                logger.info("SNIP already configured")
+                retry = False
 
 
 def configure_vpx(vpx_info, services):
