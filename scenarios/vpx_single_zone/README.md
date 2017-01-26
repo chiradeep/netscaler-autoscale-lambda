@@ -27,7 +27,7 @@ Components of the config are:
 * A Linux jumpbox in the public subnet with security group rules allowing it access to the VPX private ENIs and ssh access from the Internet. Jumpbox has an auto-assigned public IP.
 * A periodic CloudWatch event (see `invoke.tf`) that triggers the lambda function every 5 minutes. This is to provoke the initial config of the VPX SNIP and the initial VPX LB configuration. However, the first invoke may fail since the VPX may not have completed its internal initialization. Subsequent invokes should succeed. The periodic invocation should also take care of those scenarios where the regular lambda invocation failed due to various reasons 
 
-<img src="../docs/aws_vpx_single.png" width="720"/>
+<img src="../../docs/aws_vpx_single.png" width="720"/>
 
 # Pre-requisites
 AWS account with sufficient privileges to create all the above. 
