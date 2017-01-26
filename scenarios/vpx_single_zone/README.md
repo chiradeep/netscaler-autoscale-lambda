@@ -25,7 +25,7 @@ Components of the config are:
 	- DynamoDb table for Mutual exclusion
 * VPC Endpoint to AWS S3, allowing lambda access to S3
 * A Linux jumpbox in the public subnet with security group rules allowing it access to the VPX private ENIs and ssh access from the Internet. Jumpbox has an auto-assigned public IP.
-* A periodic CloudWatch event (see `invoke.tf`) that triggers the lambda function every 15 minutes. This is to provoke the initial config of the VPX SNIP and the initial VPX LB configuration. However, the first invoke may fail since the VPX may not have completed its internal initialization. Subsequent invokes should succeed. The periodic invocation should also take care of those scenarios where the regular lambda invocation failed due to various reasons (
+* A periodic CloudWatch event (see `invoke.tf`) that triggers the lambda function every 5 minutes. This is to provoke the initial config of the VPX SNIP and the initial VPX LB configuration. However, the first invoke may fail since the VPX may not have completed its internal initialization. Subsequent invokes should succeed. The periodic invocation should also take care of those scenarios where the regular lambda invocation failed due to various reasons 
 
 <img src="../docs/aws_vpx_single.png" width="720"/>
 
@@ -68,11 +68,6 @@ terraform apply -var 'key_name=my_us_east_1_keypair' -var 'aws_region=us-east-1'
  - `nat_eips` - list of Elastic IP ids (if any are provisioned)
 
 
-# Use Lambda with a pre-existing VPC, VPX and ASG
-Copy `lambda.tf` and the `lambda` subdirectory to a different location and make changes appropriately to the inputs in `lambda.tf`. Also take a look at `lambda/variables.tf` to verify that the defaults are correct. If not add the correct variable values to `lambda.tf. You will still require access to the output of `make package-lambda` (`bundle.zip`) and `make package-config` (`config.zip`) in a directory above the `lambda.tf` location.
-
 # BUGS
 `terraform destroy` may hang while trying to destroy the VPC. This is because creating the lambda function automatically creates an ENI (unknown to terraform). Deleting the lambda does not delete the ENI. This may be fixed in later versions of terraform (> v0.8.1)
 
-# TODO
-* Install the license file in the VPX from an S3 bucket. New VPXs do not come with license files already installed
